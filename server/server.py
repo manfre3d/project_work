@@ -1,5 +1,6 @@
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from routes import route_request
+from db import init_db
 
 class MyHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -15,6 +16,7 @@ class MyHandler(BaseHTTPRequestHandler):
         route_request(self, "DELETE")
 
 def run_server(port=8000):
+    init_db() 
     server_address = ("", port)
     httpd = HTTPServer(server_address, MyHandler)
     print(f"Server in esecuzione sulla porta {port}...")
