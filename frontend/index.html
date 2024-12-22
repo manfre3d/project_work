@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Servizio di Prenotazione</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Servizio di Prenotazione Online</h1>
+    </header>
+
+    <nav>
+      <button id="btn-show-bookings">Visualizza Prenotazioni</button>
+      <button id="btn-new-booking">Nuova Prenotazione</button>
+      <!-- Se prevedi anche gestione utenti... -->
+      <button id="btn-show-users">Utenti</button>
+      <button id="btn-new-user">Nuovo Utente</button>
+    </nav>
+
+    <main>
+      <!-- Sezione per mostrare le prenotazioni -->
+      <section id="section-bookings" style="display: none">
+        <h2>Elenco Prenotazioni</h2>
+        <div id="bookings-list"></div>
+      </section>
+
+      <!-- Sezione per inserire una nuova prenotazione -->
+      <section id="section-new-booking" style="display: none">
+        <h2>Crea una Prenotazione</h2>
+        <form id="form-new-booking">
+          <label for="customer_name">Nome Cliente:</label>
+          <input type="text" id="customer_name" name="customer_name" required />
+
+          <label for="date">Data (YYYY-MM-DD):</label>
+          <input type="date" id="date" name="date" required />
+
+          <label for="service">Servizio:</label>
+          <input type="text" id="service" name="service" required />
+
+          <button type="submit">Invia Prenotazione</button>
+        </form>
+      </section>
+
+      <!-- Sezione per mostrare utenti (se necessario) -->
+      <section id="section-users" style="display: none">
+        <h2>Elenco Utenti</h2>
+        <div id="users-list"></div>
+      </section>
+
+      <!-- Sezione per creare un nuovo utente (se necessario) -->
+      <section id="section-new-user" style="display: none">
+        <h2>Crea Nuovo Utente</h2>
+        <form id="form-new-user">
+          <label for="username">Username:</label>
+          <input type="text" id="username" name="username" required />
+
+          <label for="password">Password:</label>
+          <input type="password" id="password" name="password" required />
+
+          <label for="email">Email:</label>
+          <input type="email" id="email" name="email" />
+
+          <button type="submit">Registra</button>
+        </form>
+      </section>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>
