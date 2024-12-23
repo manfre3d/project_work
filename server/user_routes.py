@@ -3,7 +3,9 @@ from db import get_connection
 
 def _set_headers(handler, code=200, content_type="application/json"):
     handler.send_response(code)
-    handler.send_header("Content-Type", content_type)
+    handler.send_header("Access-Control-Allow-Origin", "*")
+    # impostazione tipo response json
+    handler.send_header("Content-Type", "application/json")
     handler.end_headers()
 
 def handle_get_all_users(handler):
@@ -24,6 +26,7 @@ def handle_get_all_users(handler):
 
     _set_headers(handler, 200)
     handler.wfile.write(json.dumps(results).encode("utf-8"))
+    return
 
 def handle_get_user_by_id(handler, user_id):
     """GET /users/<id> - Ritorna il singolo utente se esiste."""
