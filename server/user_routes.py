@@ -5,7 +5,7 @@ def _set_headers(handler, code=200, content_type="application/json"):
     handler.send_response(code)
     handler.send_header("Access-Control-Allow-Origin", "*")
     # impostazione tipo response json
-    handler.send_header("Content-Type", "application/json")
+    handler.send_header("Content-Type", content_type)
     handler.end_headers()
 
 def handle_get_all_users(handler):

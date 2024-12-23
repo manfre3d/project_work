@@ -3,7 +3,7 @@ from routes import route_request
 from db import init_db
 
 class MyHandler(BaseHTTPRequestHandler):
-    server_version = "MyCustomHTTP"
+    server_version = "CustomHTTPServer"
     sys_version = ""
     protocol_version = "HTTP/1.1"
 
