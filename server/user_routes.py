@@ -1,12 +1,13 @@
 import json
 from db import get_connection
 
-def _set_headers(handler, code=200, content_type="application/json", content_length="0"):
+def _set_headers(handler, code=200, response_data={},content_type="application/json"):
     handler.send_response(code)
     handler.send_header("Access-Control-Allow-Origin", "*")
     # impostazione tipo response json
     handler.send_header("Content-Type", content_type)
     # impostazione content_length
+    content_length = str(len(response_data))
     handler.send_header("Content-Length", content_length) 
 
     handler.end_headers()
@@ -27,11 +28,10 @@ def handle_get_all_users(handler):
             "email": row[3]
         })
 
-    data = json.dumps(results).encode("utf-8")
-    content_length = str(len(data))
+    response_data = json.dumps(results).encode("utf-8")
 
-    _set_headers(handler, 200,"application/json", content_length)
-    handler.wfile.write(data)
+    _set_headers(handler, 200, response_data)
+    handler.wfile.write(response_data)
     return
 
 def handle_get_user_by_id(handler, user_id):
@@ -39,8 +39,9 @@ def handle_get_user_by_id(handler, user_id):
     try:
         user_id = int(user_id)
     except ValueError:
-        _set_headers(handler, 400)
-        handler.wfile.write(json.dumps({"error": "Invalid ID"}).encode("utf-8"))
+        error_response = json.dumps({"error": "Invalid ID"}).encode("utf-8")
+        _set_headers(handler, 400, error_response)
+        handler.wfile.write(error_response)
         return
     
     with get_connection() as conn:
@@ -55,11 +56,15 @@ def handle_get_user_by_id(handler, user_id):
             "password": row[2],  # da mascherare in produzione
             "email": row[3]
         }
-        _set_headers(handler, 200)
-        handler.wfile.write(json.dumps(result).encode("utf-8"))
+        response_data = json.dumps(result).encode("utf-8")
+
+        _set_headers(handler, 200, response_data)
+        handler.wfile.write(response_data)
     else:
-        _set_headers(handler, 404)
-        handler.wfile.write(json.dumps({"error": "User not found"}).encode("utf-8"))
+        error_response = json.dumps({"error": "User not found"}).encode("utf-8")
+        _set_headers(handler, 404, error_response)
+        handler.wfile.write(error_response)
+    return
 
 def handle_create_user(handler):
     """POST /users - Crea un nuovo utente nel DB."""
@@ -69,8 +74,9 @@ def handle_create_user(handler):
     try:
         data = json.loads(body)
     except json.JSONDecodeError:
-        _set_headers(handler, 400)
-        handler.wfile.write(json.dumps({"error": "Invalid JSON"}).encode("utf-8"))
+        error_response = json.dumps({"error": "Invalid JSON"}).encode("utf-8")
+        _set_headers(handler, 400, error_response)
+        handler.wfile.write(error_response)
         return
 
     username = data.get("username", "")
@@ -92,16 +98,20 @@ def handle_create_user(handler):
         "password": password,
         "email": email
     }
-    _set_headers(handler, 201)
-    handler.wfile.write(json.dumps(new_user).encode("utf-8"))
+    response_data = json.dumps(new_user).encode("utf-8")
+
+    _set_headers(handler, 201, response_data)
+    handler.wfile.write(response_data)
+    return
 
 def handle_update_user(handler, user_id):
     """PUT /users/<id> - Aggiorna i campi di un utente."""
     try:
         user_id = int(user_id)
     except ValueError:
-        _set_headers(handler, 400)
-        handler.wfile.write(json.dumps({"error": "Invalid ID"}).encode("utf-8"))
+        error_response = json.dumps({"error": "Invalid ID"}).encode("utf-8")
+        _set_headers(handler, 400, error_response)
+        handler.wfile.write(error_response)
         return
     
     content_length = int(handler.headers.get("Content-Length", 0))
@@ -110,8 +120,9 @@ def handle_update_user(handler, user_id):
     try:
         data = json.loads(body)
     except json.JSONDecodeError:
-        _set_headers(handler, 400)
-        handler.wfile.write(json.dumps({"error": "Invalid JSON"}).encode("utf-8"))
+        error_response = json.dumps({"error": "Invalid ID"}).encode("utf-8")
+        _set_headers(handler, 400, error_response)
+        handler.wfile.write(error_response)
         return
 
     # campi aggiornabili
@@ -125,8 +136,9 @@ def handle_update_user(handler, user_id):
         c.execute("SELECT id, username, password, email FROM users WHERE id = ?", (user_id,))
         row = c.fetchone()
         if not row:
-            _set_headers(handler, 404)
-            handler.wfile.write(json.dumps({"error": "User not found"}).encode("utf-8"))
+            error_response = json.dumps({"error": "User not found"}).encode("utf-8")
+            _set_headers(handler, 404, error_response)
+            handler.wfile.write(error_response)
             return
 
         existing_id, existing_username, existing_password, existing_email = row
@@ -147,16 +159,18 @@ def handle_update_user(handler, user_id):
         "password": updated_password,
         "email": updated_email
     }
-    _set_headers(handler, 200)
-    handler.wfile.write(json.dumps(updated_user).encode("utf-8"))
+    response_data = json.dumps(updated_user).encode("utf-8")
+    _set_headers(handler, 200, response_data)
+    handler.wfile.write(response_data)
 
 def handle_delete_user(handler, user_id):
     """DELETE /users/<id> - Elimina l'utente dal DB."""
     try:
         user_id = int(user_id)
     except ValueError:
-        _set_headers(handler, 400)
-        handler.wfile.write(json.dumps({"error": "Invalid ID"}).encode("utf-8"))
+        error_response = json.dumps({"error": "Invalid ID"}).encode("utf-8")
+        _set_headers(handler, 400, error_response)
+        handler.wfile.write(error_response)
         return
 
     with get_connection() as conn:
@@ -165,12 +179,13 @@ def handle_delete_user(handler, user_id):
         c.execute("SELECT id FROM users WHERE id = ?", (user_id,))
         row = c.fetchone()
         if not row:
-            _set_headers(handler, 404)
-            handler.wfile.write(json.dumps({"error": "User not found"}).encode("utf-8"))
+            error_response = json.dumps({"error": "User not found"}).encode("utf-8")
+            _set_headers(handler, 404, error_response)
+            handler.wfile.write(error_response)
             return
 
         c.execute("DELETE FROM users WHERE id = ?", (user_id,))
         conn.commit()
-
-    _set_headers(handler, 200)
-    handler.wfile.write(json.dumps({"message": f"User {user_id} deleted"}).encode("utf-8"))
+    response_data = json.dumps({"message": f"User {user_id} deleted"}).encode("utf-8")
+    _set_headers(handler, 200, response_data)
+    handler.wfile.write(response_data)
