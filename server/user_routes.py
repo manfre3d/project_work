@@ -1,16 +1,8 @@
 import json
 from db import get_connection
-
-def _set_headers(handler, code=200, response_data={},content_type="application/json"):
-    handler.send_response(code)
-    handler.send_header("Access-Control-Allow-Origin", "*")
-    # impostazione tipo response json
-    handler.send_header("Content-Type", content_type)
-    # impostazione content_length
-    content_length = str(len(response_data))
-    handler.send_header("Content-Length", content_length) 
-
-    handler.end_headers()
+from utility import (
+    _set_headers
+)
 
 def handle_get_all_users(handler):
     """GET /users - Ritorna tutti gli utenti."""
@@ -32,7 +24,6 @@ def handle_get_all_users(handler):
 
     _set_headers(handler, 200, response_data)
     handler.wfile.write(response_data)
-    return
 
 def handle_get_user_by_id(handler, user_id):
     """GET /users/<id> - Ritorna il singolo utente se esiste."""
@@ -64,7 +55,7 @@ def handle_get_user_by_id(handler, user_id):
         error_response = json.dumps({"error": "User not found"}).encode("utf-8")
         _set_headers(handler, 404, error_response)
         handler.wfile.write(error_response)
-    return
+    
 
 def handle_create_user(handler):
     """POST /users - Crea un nuovo utente nel DB."""
@@ -102,7 +93,7 @@ def handle_create_user(handler):
 
     _set_headers(handler, 201, response_data)
     handler.wfile.write(response_data)
-    return
+
 
 def handle_update_user(handler, user_id):
     """PUT /users/<id> - Aggiorna i campi di un utente."""
