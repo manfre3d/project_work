@@ -1,10 +1,9 @@
 import json
 from db import get_connection
+from utility import (
+    _set_headers
+)
 
-def _set_headers(handler, code=200, content_type="application/json"):
-    handler.send_response(code)
-    handler.send_header("Content-Type", content_type)
-    handler.end_headers()
 
 def handle_get_all_bookings(handler):
     """GET /bookings - Ritorna tutte le prenotazioni dal DB."""
@@ -22,17 +21,18 @@ def handle_get_all_bookings(handler):
             "date": row[2],
             "service": row[3]
         })
-
-    _set_headers(handler, 200)
-    handler.wfile.write(json.dumps(results).encode("utf-8"))
+    response_data = json.dumps(results).encode("utf-8")
+    _set_headers(handler, 200, response_data)
+    handler.wfile.write(response_data)
 
 def handle_get_booking_by_id(handler, booking_id):
     """GET /bookings/<id> - Ritorna la singola prenotazione, se esiste."""
     try:
         booking_id = int(booking_id)
     except ValueError:
-        _set_headers(handler, 400)
-        handler.wfile.write(json.dumps({"error": "Invalid ID"}).encode("utf-8"))
+        error_response = json.dumps({"error": "Invalid ID"}).encode("utf-8")
+        _set_headers(handler, 400, error_response)
+        handler.wfile.write(error_response)
         return
     
     with get_connection() as conn:
@@ -47,11 +47,13 @@ def handle_get_booking_by_id(handler, booking_id):
             "date": row[2],
             "service": row[3]
         }
-        _set_headers(handler, 200)
-        handler.wfile.write(json.dumps(result).encode("utf-8"))
+        response_data = json.dumps(result).encode("utf-8")
+        _set_headers(handler, 200, response_data)
+        handler.wfile.write(response_data)
     else:
-        _set_headers(handler, 404)
-        handler.wfile.write(json.dumps({"error": "Booking not found"}).encode("utf-8"))
+        error_response = json.dumps({"error": "Booking not found"}).encode("utf-8")
+        _set_headers(handler, 404, error_response)
+        handler.wfile.write(error_response)
 
 def handle_create_booking(handler):
     """POST /bookings - Crea una nuova prenotazione nel DB."""
@@ -61,8 +63,9 @@ def handle_create_booking(handler):
     try:
         data = json.loads(body)
     except json.JSONDecodeError:
-        _set_headers(handler, 400)
-        handler.wfile.write(json.dumps({"error": "Invalid JSON"}).encode("utf-8"))
+        error_response = json.dumps({"error": "Invalid JSON"}).encode("utf-8")
+        _set_headers(handler, 400, error_response)
+        handler.wfile.write(error_response)
         return
 
     # Recupera campi dal body
@@ -87,16 +90,18 @@ def handle_create_booking(handler):
         "date": date,
         "service": service
     }
-    _set_headers(handler, 201)  # Created
-    handler.wfile.write(json.dumps(new_booking).encode("utf-8"))
+    response_data = json.dumps(new_booking).encode("utf-8")
+    _set_headers(handler, 201, response_data)
+    handler.wfile.write(response_data)
 
 def handle_update_booking(handler, booking_id):
     """PUT /bookings/<id> - Aggiorna la prenotazione indicata."""
     try:
         booking_id = int(booking_id)
     except ValueError:
-        _set_headers(handler, 400)
-        handler.wfile.write(json.dumps({"error": "Invalid ID"}).encode("utf-8"))
+        error_response = json.dumps({"error": "Invalid ID"}).encode("utf-8")
+        _set_headers(handler, 400, error_response)
+        handler.wfile.write(error_response)
         return
 
     content_length = int(handler.headers.get("Content-Length", 0))
@@ -105,8 +110,9 @@ def handle_update_booking(handler, booking_id):
     try:
         data = json.loads(body)
     except json.JSONDecodeError:
-        _set_headers(handler, 400)
-        handler.wfile.write(json.dumps({"error": "Invalid JSON"}).encode("utf-8"))
+        error_response = json.dumps({"error": "Invalid JSON"}).encode("utf-8")
+        _set_headers(handler, 400, error_response)
+        handler.wfile.write(error_response)
         return
 
     # Campi aggiornabili
@@ -120,8 +126,9 @@ def handle_update_booking(handler, booking_id):
         c.execute("SELECT id, customer_name, date, service FROM bookings WHERE id = ?", (booking_id,))
         row = c.fetchone()
         if not row:
-            _set_headers(handler, 404)
-            handler.wfile.write(json.dumps({"error": "Booking not found"}).encode("utf-8"))
+            error_response = json.dumps({"error": "Booking not found"}).encode("utf-8")
+            _set_headers(handler, 404, error_response)
+            handler.wfile.write(error_response)
             return
         
         # Se esiste, costruiamo i campi aggiornati
@@ -144,16 +151,18 @@ def handle_update_booking(handler, booking_id):
         "date": updated_date,
         "service": updated_service
     }
-    _set_headers(handler, 200)
-    handler.wfile.write(json.dumps(updated_booking).encode("utf-8"))
+    response_data = json.dumps(updated_booking).encode("utf-8")
+    _set_headers(handler, 200, response_data)
+    handler.wfile.write(error_response)
 
 def handle_delete_booking(handler, booking_id):
     """DELETE /bookings/<id> - Elimina la prenotazione dal DB."""
     try:
         booking_id = int(booking_id)
     except ValueError:
-        _set_headers(handler, 400)
-        handler.wfile.write(json.dumps({"error": "Invalid ID"}).encode("utf-8"))
+        error_response = json.dumps({"error": "Invalid ID"}).encode("utf-8")
+        _set_headers(handler, 400, error_response)
+        handler.wfile.write(error_response)
         return
 
     with get_connection() as conn:
@@ -162,12 +171,14 @@ def handle_delete_booking(handler, booking_id):
         c.execute("SELECT id FROM bookings WHERE id = ?", (booking_id,))
         row = c.fetchone()
         if not row:
-            _set_headers(handler, 404)
-            handler.wfile.write(json.dumps({"error": "Booking not found"}).encode("utf-8"))
+            error_response = json.dumps({"error": "Booking not found"}).encode("utf-8")
+            _set_headers(handler, 404, error_response)
+            handler.wfile.write(error_response)
             return
 
         c.execute("DELETE FROM bookings WHERE id = ?", (booking_id,))
         conn.commit()
 
-    _set_headers(handler, 200)
-    handler.wfile.write(json.dumps({"message": f"Booking {booking_id} deleted"}).encode("utf-8"))
+    response_data = json.dumps({"message": f"Booking {booking_id} deleted"}).encode("utf-8")
+    _set_headers(handler, 200, response_data)
+    handler.wfile.write(response_data)
