@@ -153,7 +153,7 @@ def handle_update_booking(handler, booking_id):
     }
     response_data = json.dumps(updated_booking).encode("utf-8")
     _set_headers(handler, 200, response_data)
-    handler.wfile.write(error_response)
+    handler.wfile.write(response_data)
 
 def handle_delete_booking(handler, booking_id):
     """DELETE /bookings/<id> - Elimina la prenotazione dal DB."""
