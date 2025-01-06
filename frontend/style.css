@@ -1,6 +1,56 @@
-/* styles.css */
+/* Body con sfondo gradiente */
+body {
+  margin: 0;
+  font-family: "Roboto", Arial, sans-serif;
+  /* Sfondi gradiente */
+  background: linear-gradient(
+    135deg,
+    rgba(242, 246, 248, 1) 0%,
+    rgba(224, 239, 248, 1) 100%
+  );
+  min-height: 100vh;
+}
 
-/* Regola per nascondere di default le sezioni (se non usi la classe .active) */
+/* Navbar brand: aggiunge un tocco di ombra */
+.navbar-brand {
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+/* Title del sito (se usi un <h1> in body) */
+h1 {
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #2c3e50;
+  text-shadow: 1px 1px 2px #bbb;
+}
+
+/* Miglioriamo i button di login, logout, prenotazioni, ecc. */
+.navbar-nav button {
+  margin: 0 0.2rem;
+  font-weight: 500;
+  transition: transform 0.1s ease;
+}
+
+/* Hover effect sui bottoni nella navbar */
+.navbar-nav button:hover {
+  transform: scale(1.05);
+}
+
+/* Esempio di override colore pulsante login se vuoi */
+#btn-login {
+  color: #fff !important;
+  background-color: #ff6600 !important; /* un arancione */
+  border-color: #ff6600 !important;
+  /* padding: 0 .5em; */
+}
+#btn-login:hover {
+  background-color: #e65c00 !important;
+  border-color: #e65c00 !important;
+}
+
+/* Sezione di default hidden: usiamo la classe .active per mostrarle */
 section {
   display: none;
 }
@@ -10,14 +60,136 @@ section {
   display: block;
 }
 
-/* Personalizza il titolo */
-h1 {
-  font-weight: 700;
-  letter-spacing: 1px;
+/* Contenitore delle sezioni: card-like con ombra */
+section {
+  background-color: #ffffffcc; /* bianco con un tocco di trasparenza */
+  backdrop-filter: blur(4px);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 1.5rem;
+  margin-bottom: 2rem;
 }
 
-/* Esempio di override colore pulsante login se vuoi */
-#btn-login {
-  color: #fff;
-  background-color: #ff6600; /* un arancione */
+/* Form di login e prenotazioni */
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
+
+/* Input personalizzati */
+form input.form-control {
+  border: 2px solid #ccc;
+  border-radius: 6px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Hover e focus sugli input */
+form input.form-control:hover {
+  border-color: #aaa;
+}
+form input.form-control:focus {
+  border-color: #007bff;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+/* Bottoni dei form */
+form button.btn {
+  border-radius: 6px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+/* Booking list style */
+.booking-list {
+  margin-top: 1rem;
+}
+.booking-list ul {
+  list-style: none;
+  padding-left: 0;
+}
+.booking-list li {
+  background-color: #fafafa;
+  padding: 0.8rem;
+  margin-bottom: 0.5rem;
+  border-radius: 4px;
+  border-left: 3px solid #007bff;
+  transition: background-color 0.2s;
+}
+.booking-list li:hover {
+  background-color: #f0f0f0;
+}
+
+/* Modale: puoi personalizzare il colore e ombra */
+/* Modal custom animation (entrata/uscita) */
+.modal.fade .modal-dialog {
+  transform: translateY(-30px);
+  opacity: 0;
+  transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+}
+.modal.fade.show .modal-dialog {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+/* Ombra più accentuata e bordi arrotondati */
+.modal-content {
+  border-radius: 10px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+/* Header colorato (override di default) */
+.modal-header {
+  background: linear-gradient(
+    135deg,
+    #007bff 0%,
+    #0056b3 100%
+  );
+  color: #fff;
+  border-top-left-radius: 10px;
+  border-top-right-radius: 10px;
+  /* Se vuoi più spazio */
+  padding: 1rem 1.5rem;
+}
+
+/* Cambia il colore del titolo se preferisci */
+.modal-title {
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+/* Bottone chiudi */
+.modal-header .btn-close {
+  filter: invert(1); /* Per rendere l'icona X bianca */
+  opacity: 0.8;
+}
+.modal-header .btn-close:hover {
+  opacity: 1;
+}
+
+/* Corpo */
+.modal-body {
+  min-height: 100px; /* se vuoi un minimo di altezza */
+  padding: 1.5rem;
+}
+
+/* Footer */
+.modal-footer {
+  border-bottom-left-radius: 10px;
+  border-bottom-right-radius: 10px;
+  /* Gradient su footer, se vuoi */
+  background: #f8f9fa;
+  padding: 1rem 1.5rem;
+}
+
+/* Pulsante “Conferma” */
+#modalConfirmBtn {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: transform 0.1s ease;
+}
+#modalConfirmBtn:hover {
+  transform: scale(1.03);
+}
+
