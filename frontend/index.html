@@ -1,71 +1,138 @@
 <!DOCTYPE html>
 <html lang="it">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Servizio di Prenotazione</title>
-    <link rel="stylesheet" href="style.css" />
-  </head>
-  <body>
-    <header>
-      <h1>Servizio di Prenotazione Online</h1>
-    </header>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cinema Booking - Mobile First</title>
 
-    <nav>
-      <button id="btn-show-bookings">Visualizza Prenotazioni</button>
-      <button id="btn-new-booking">Nuova Prenotazione</button>
-      <!-- Se prevedi anche gestione utenti... -->
-      <button id="btn-show-users">Utenti</button>
-      <button id="btn-new-user">Nuovo Utente</button>
-    </nav>
+  <!-- Stile minimal, mobile-first -->
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+    }
 
-    <main>
-      <!-- Sezione per mostrare le prenotazioni -->
-      <section id="section-bookings" style="display: none">
-        <h2>Elenco Prenotazioni</h2>
-        <div id="bookings-list"></div>
-      </section>
+    header {
+      background: #4c67a1;
+      color: #fff;
+      padding: 1rem;
+      text-align: center;
+    }
 
-      <!-- Sezione per inserire una nuova prenotazione -->
-      <section id="section-new-booking" style="display: none">
-        <h2>Crea una Prenotazione</h2>
-        <form id="form-new-booking">
-          <label for="customer_name">Nome Cliente:</label>
-          <input type="text" id="customer_name" name="customer_name" required />
+    nav {
+      background: #fff;
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+      padding: 0.5rem;
+      border-bottom: 1px solid #ccc;
+    }
 
-          <label for="date">Data (YYYY-MM-DD):</label>
-          <input type="date" id="date" name="date" required />
+    nav button {
+      padding: 0.5rem 1rem;
+      border: 1px solid #aaa;
+      background: #f7f7f7;
+      border-radius: 4px;
+      cursor: pointer;
+    }
 
-          <label for="service">Servizio:</label>
-          <input type="text" id="service" name="service" required />
+    main {
+      padding: 1rem;
+    }
 
-          <button type="submit">Invia Prenotazione</button>
-        </form>
-      </section>
+    /* Sezioni da mostrare/nascondere */
+    section {
+      display: none; /* di default nascoste */
+    }
 
-      <!-- Sezione per mostrare utenti (se necessario) -->
-      <section id="section-users" style="display: none">
-        <h2>Elenco Utenti</h2>
-        <div id="users-list"></div>
-      </section>
+    /* Mobile-first => layout semplice
+       eventuali media query per schermi più larghi */
+    @media (min-width: 768px) {
+      nav {
+        justify-content: flex-start;
+      }
+    }
 
-      <!-- Sezione per creare un nuovo utente (se necessario) -->
-      <section id="section-new-user" style="display: none">
-        <h2>Crea Nuovo Utente</h2>
-        <form id="form-new-user">
-          <label for="username">Username:</label>
-          <input type="text" id="username" name="username" required />
+    /* Esempio di form responsive */
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      max-width: 300px;
+      margin: 0 auto;
+    }
 
-          <label for="password">Password:</label>
-          <input type="password" id="password" name="password" required />
+    form input {
+      padding: 0.5rem;
+      font-size: 1rem;
+    }
 
-          <label for="email">Email:</label>
-          <input type="email" id="email" name="email" />
+    .booking-list, .user-list {
+      margin-top: 1rem;
+    }
 
-          <button type="submit">Registra</button>
-        </form>
-      </section>
-    </main>
+    /* Sezione attiva */
+    .active {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Cinema Booking - Mobile First</h1>
+  </header>
 
-    <script src="script.js"></script>
-  </body>
+  <!-- Barra di navigazione -->
+  <nav>
+    <button id="btn-login">Login</button>
+    <button id="btn-logout" style="display:none;">Logout</button>
+    <button id="btn-bookings">Prenotazioni</button>
+    <button id="btn-new-booking">Nuova Prenotazione</button>
+  </nav>
+
+  <main>
+    <!-- Sezione LOGIN -->
+    <section id="section-login">
+      <h2>Accesso Utente</h2>
+      <form id="login-form">
+        <label for="username">Username:</label>
+        <input id="username" name="username" type="text" required />
+
+        <label for="password">Password:</label>
+        <input id="password" name="password" type="password" required />
+
+        <button type="submit">Accedi</button>
+      </form>
+    </section>
+
+    <!-- Sezione LISTA PRENOTAZIONI -->
+    <section id="section-bookings">
+      <h2>Tutte le Prenotazioni</h2>
+      <div id="booking-list" class="booking-list"></div>
+    </section>
+
+    <!-- Sezione NUOVA PRENOTAZIONE -->
+    <section id="section-new-booking">
+      <h2>Nuova Prenotazione</h2>
+      <form id="form-new-booking">
+        <!-- Esempio di campi 'film' e 'data' -->
+        <label for="customer_name">Nome Cliente:</label>
+        <input id="customer_name" name="customer_name" type="text" required />
+
+        <label for="date">Data (YYYY-MM-DD):</label>
+        <input id="date" name="date" type="date" required />
+
+        <label for="service">Film o Sala:</label>
+        <input id="service" name="service" type="text" required />
+
+        <!-- user_id se già loggati? 
+             In un'app reale potresti ricavarlo dal login.
+        -->
+        <button type="submit">Prenota</button>
+      </form>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
 </html>
