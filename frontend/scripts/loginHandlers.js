@@ -40,7 +40,7 @@ export function setupLoginHandler() {
       loadAllBookings();
     } catch (error) {
       console.error("Errore login:", error);
-      showModal(`Errore nel login: ${error.message}`);
+      showModal("Attenzione",`Errore nel login: ${error.message}`);
     }
   });
 }

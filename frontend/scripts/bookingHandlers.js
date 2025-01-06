@@ -72,14 +72,15 @@ export function setupBookingHandler() {
       }
 
       const created = await response.json();
-      showModal(`Prenotazione creata con ID=${created.id}`);
+      // con ID=${created.id}
+      showModal(`Prenotazione creata`, `La tua prenotazione è stata creata!`);
 
       // Puliamo il form e mostriamo la lista
       formNewBooking.reset();
       showSection(sectionBookings);
       loadAllBookings();
     } catch (error) {
-      showModal(`Errore: ${error.message}`);
+      showModal("Errore",`Messaggio di errore: ${error.message}`);
       console.error("Errore POST prenotazione:", error);
     }
   });
