@@ -4,6 +4,62 @@ from utility import (
     _set_headers
 )
 
+
+def handle_login(handler):
+    """
+    POST /login
+    Riceve JSON con {"username": "...", "password": "..."}.
+    Verifica nel DB e restituisce un JSON con dati utente o errore.
+    """
+    # 1) Leggi il body
+    content_length = int(handler.headers.get("Content-Length", 0))
+    body = handler.rfile.read(content_length).decode("utf-8")
+    print(body)
+    # 2) Parse JSON
+    try:
+        data = json.loads(body)
+        print(data)
+
+        username = data["username"]
+        password = data["password"]
+    except (json.JSONDecodeError, KeyError):
+        error_bytes = json.dumps({"error": "Invalid JSON or missing fields"}).encode("utf-8")
+        _set_headers(handler, 400, error_bytes)
+        handler.wfile.write(error_bytes)
+        return
+
+    # 3) Cerca nel DB
+    with get_connection() as conn:
+        c = conn.cursor()
+        c.execute("""
+            SELECT id, username, password, email
+            FROM users
+            WHERE username = ? AND password = ?
+        """, (username, password))
+        row = c.fetchone()
+
+    if row:
+        print (row)
+        # Trovato => restituiamo i dati utente (senza password in un'app reale).
+        user_id, uname, pwd, email = row
+        # Esempio di risposta
+        user_obj = {
+            "id": user_id,
+            "username": uname,
+            "email": email,
+            "message": "Login successful"
+        }
+        
+        response_data = json.dumps(user_obj).encode("utf-8")
+        _set_headers(handler, 200, response_data)
+        handler.wfile.write(response_data)
+    else:
+        # Non trovato => errore 401 unauthorized
+        error_response = json.dumps({"error": "Wrong username or password"}).encode("utf-8")
+        _set_headers(handler, 401, error_response)
+        handler.wfile.write(error_response)
+
+
 def handle_get_all_users(handler):
     """GET /users - Ritorna tutti gli utenti."""
     with get_connection() as conn:

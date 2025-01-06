@@ -7,6 +7,7 @@ from booking_routes import (
     handle_delete_booking
 )
 from user_routes import (
+    handle_login,
     handle_get_all_users,
     handle_get_user_by_id,
     handle_create_user,
@@ -48,6 +49,15 @@ def route_request(handler, method):
                 handle_404(handler)
         return
 
+    # --- blocco: /login ---
+    if resource == "login":
+        # Solo POST /login
+        if method == "POST":
+            handle_login(handler)
+        else:
+            handle_404(handler)
+        return
+    
     if resource == "users":
         if resource_id is None:
             # Rotta /users
