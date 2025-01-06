@@ -21,3 +21,10 @@ export let currentUserId = null;
 export function setCurrentUserId(id) {
   currentUserId = id;
 }
+// Seleziona gli elementi HTML interni alla modale
+export const modalTitleEl = document.getElementById("modalTitle");
+export const modalBodyEl = document.getElementById("modalBody");
+
+
+
+

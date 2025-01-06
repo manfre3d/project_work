@@ -11,6 +11,7 @@ import {
 } from "./references.js";
 
 import { loadAllBookings } from "./bookingHandlers.js";
+import { showModal } from "./utility.js";
 
 export function showSection(section) {
   // nascondi tutte
@@ -27,7 +28,7 @@ function handleBtnLoginClick() {
 
 function handleBtnLogoutClick() {
   setCurrentUserId(null);
-  alert("Logout effettuato");
+  showModal("Logout effettuato", "Arrivederci!");
   btnLogout.style.display = "none";
   showSection(sectionLogin);
 }
@@ -39,7 +40,7 @@ function handleBtnBookingsClick() {
 
 function handleBtnNewBookingClick() {
   if (!currentUserId) {
-    alert("Devi effettuare il login per prenotare!");
+    showModal("Attenzione","Devi effettuare il login per prenotare!");
     showSection(sectionLogin);
     return;
   }

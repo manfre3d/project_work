@@ -3,6 +3,7 @@ import { loginForm, btnLogout, setCurrentUserId } from "./references.js";
 import { showSection } from "./navigationHandlers.js";
 import { loadAllBookings } from "./bookingHandlers.js";
 import { sectionBookings } from "./references.js";
+import { showModal, capitalizeFirstLetter } from "./utility.js";
 
 export function setupLoginHandler() {
   loginForm.addEventListener("submit", async (e) => {
@@ -29,8 +30,9 @@ export function setupLoginHandler() {
       // userData = { id, username, email, message }
 
       setCurrentUserId(userData.id);
-      alert(
-        `Login effettuato! Bentornato, ${userData.username} (ID=${userData.id})`
+      // (ID=${userData.id})
+      showModal(
+        `Login effettuato!`,`Bentornato, ${capitalizeFirstLetter(userData.username)}!`
       );
 
       btnLogout.style.display = "inline-block";
@@ -38,7 +40,7 @@ export function setupLoginHandler() {
       loadAllBookings();
     } catch (error) {
       console.error("Errore login:", error);
-      alert(`Errore nel login: ${error.message}`);
+      showModal(`Errore nel login: ${error.message}`);
     }
   });
 }

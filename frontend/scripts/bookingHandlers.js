@@ -7,6 +7,7 @@ import {
 
 import { showSection } from "./navigationHandlers.js";
 import { sectionLogin, sectionBookings } from "./references.js";
+import { showModal } from "./utility.js";
 
 export async function loadAllBookings() {
   bookingListDiv.textContent = "Caricamento prenotazioni...";
@@ -38,7 +39,7 @@ export function setupBookingHandler() {
   formNewBooking.addEventListener("submit", async (e) => {
     e.preventDefault();
     if (!currentUserId) {
-      alert("Devi essere loggato per effettuare una prenotazione.");
+      showModal("Devi effettuare il login per poter fare una prenotazione.");
       showSection(sectionLogin);
       return;
     }
@@ -71,14 +72,14 @@ export function setupBookingHandler() {
       }
 
       const created = await response.json();
-      alert(`Prenotazione creata con ID=${created.id}`);
+      showModal(`Prenotazione creata con ID=${created.id}`);
 
       // Puliamo il form e mostriamo la lista
       formNewBooking.reset();
       showSection(sectionBookings);
       loadAllBookings();
     } catch (error) {
-      alert(`Errore: ${error.message}`);
+      showModal(`Errore: ${error.message}`);
       console.error("Errore POST prenotazione:", error);
     }
   });
