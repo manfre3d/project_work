@@ -43,7 +43,7 @@ h1 {
   color: #fff !important;
   background-color: #ff6600 !important; /* un arancione */
   border-color: #ff6600 !important;
-  /* padding: 0 .5em; */
+  padding: 0.5em;
 }
 #btn-login:hover {
   background-color: #e65c00 !important;
