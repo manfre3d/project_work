@@ -37,7 +37,8 @@ def run_server(port=8000):
     print(f"Server in esecuzione sulla porta {port}...")
 
     try:
-        httpd.serve_forever()  # Resta in ascolto finché non arriva un KeyboardInterrupt
+        # Resta in ascolto finché non arriva un KeyboardInterrupt
+        httpd.serve_forever()  
     except KeyboardInterrupt:
         print("\nRicevuto Ctrl + C: chiusura del server...")
     finally:

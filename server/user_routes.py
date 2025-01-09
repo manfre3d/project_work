@@ -1,64 +1,68 @@
 import json
+import sqlite3
 from db import get_connection
 from utility import (
     _set_headers
 )
+import bcrypt
 
 
 def handle_login(handler):
     """
     POST /login
-    Riceve JSON con {"username": "...", "password": "..."}.
-    Verifica nel DB e restituisce un JSON con dati utente o errore.
+    JSON: {"username":"...","password":"..."}
+    Verifica l'utente e controlla l'hash della password
     """
-    # 1) Leggi il body
     content_length = int(handler.headers.get("Content-Length", 0))
     body = handler.rfile.read(content_length).decode("utf-8")
-    print(body)
-    # 2) Parse JSON
+
     try:
         data = json.loads(body)
-        print(data)
-
         username = data["username"]
         password = data["password"]
     except (json.JSONDecodeError, KeyError):
-        error_bytes = json.dumps({"error": "Invalid JSON or missing fields"}).encode("utf-8")
+        error_bytes = json.dumps({"error": "JSON non valido o campi mancanti"}).encode("utf-8")
         _set_headers(handler, 400, error_bytes)
         handler.wfile.write(error_bytes)
         return
 
-    # 3) Cerca nel DB
+    # 1) Cerchiamo l'utente in base a 'username'
     with get_connection() as conn:
         c = conn.cursor()
         c.execute("""
             SELECT id, username, password, email
             FROM users
-            WHERE username = ? AND password = ?
-        """, (username, password))
+            WHERE username = ?
+        """, (username,))  # NOT password
         row = c.fetchone()
 
-    if row:
-        print (row)
-        # Trovato => restituiamo i dati utente (senza password in un'app reale).
-        user_id, uname, pwd, email = row
-        # Esempio di risposta
+    if row is None:
+        # Se l'utente non esiste
+        error_response = json.dumps({"error": "Utente inesistente"}).encode("utf-8")
+        _set_headers(handler, 401, error_response)
+        handler.wfile.write(error_response)
+        return
+
+    user_id, db_username, db_hashed_pw, email = row
+
+    # 2) Verifica password con bcrypt
+    #    db_hashed_pw = hash salvato (stringa tipo "$2b$12$...")
+    if bcrypt.checkpw(password.encode("utf-8"), db_hashed_pw.encode("utf-8")):
+        # Password corretta
         user_obj = {
             "id": user_id,
-            "username": uname,
+            "username": db_username,
             "email": email,
-            "message": "Login successful"
+            "message": "Login effettuato con successo"
         }
-        
         response_data = json.dumps(user_obj).encode("utf-8")
         _set_headers(handler, 200, response_data)
         handler.wfile.write(response_data)
     else:
-        # Non trovato => errore 401 unauthorized
-        error_response = json.dumps({"error": "Wrong username or password"}).encode("utf-8")
+        # Password errata
+        error_response = json.dumps({"error": "Username o password errati"}).encode("utf-8")
         _set_headers(handler, 401, error_response)
         handler.wfile.write(error_response)
-
 
 def handle_get_all_users(handler):
     """GET /users - Ritorna tutti gli utenti."""
@@ -72,7 +76,7 @@ def handle_get_all_users(handler):
         results.append({
             "id": row[0],
             "username": row[1],
-            "password": row[2],  # Da NON mostrare in chiaro in un’app reale
+            "password": row[2],  
             "email": row[3]
         })
 
@@ -86,7 +90,7 @@ def handle_get_user_by_id(handler, user_id):
     try:
         user_id = int(user_id)
     except ValueError:
-        error_response = json.dumps({"error": "Invalid ID"}).encode("utf-8")
+        error_response = json.dumps({"error": "ID non valido"}).encode("utf-8")
         _set_headers(handler, 400, error_response)
         handler.wfile.write(error_response)
         return
@@ -100,7 +104,7 @@ def handle_get_user_by_id(handler, user_id):
         result = {
             "id": row[0],
             "username": row[1],
-            "password": row[2],  # da mascherare in produzione
+            "password": row[2],  
             "email": row[3]
         }
         response_data = json.dumps(result).encode("utf-8")
@@ -108,7 +112,7 @@ def handle_get_user_by_id(handler, user_id):
         _set_headers(handler, 200, response_data)
         handler.wfile.write(response_data)
     else:
-        error_response = json.dumps({"error": "User not found"}).encode("utf-8")
+        error_response = json.dumps({"error": "User non trovato"}).encode("utf-8")
         _set_headers(handler, 404, error_response)
         handler.wfile.write(error_response)
     
@@ -121,28 +125,39 @@ def handle_create_user(handler):
     try:
         data = json.loads(body)
     except json.JSONDecodeError:
-        error_response = json.dumps({"error": "Invalid JSON"}).encode("utf-8")
+        error_response = json.dumps({"error": "JSON non valido"}).encode("utf-8")
         _set_headers(handler, 400, error_response)
         handler.wfile.write(error_response)
         return
 
+    # dati utente
     username = data.get("username", "")
-    password = data.get("password", "")  # da hashare in produzione
+    # password in chiaro
+    password = data.get("password", "")
     email = data.get("email", "")
+
+    # Hash password tramite bcrypt
+    hashed_pw = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
     with get_connection() as conn:
         c = conn.cursor()
-        c.execute("""
-            INSERT INTO users (username, password, email)
-            VALUES (?, ?, ?)
-        """, (username, password, email))
-        conn.commit()
-        new_id = c.lastrowid
+        try:
+            c.execute("""
+                INSERT INTO users (username, password, email)
+                VALUES (?, ?, ?)
+            """, (username, hashed_pw, email))
+            conn.commit()
+            new_id = c.lastrowid
+        except sqlite3.IntegrityError as e:
+            # Se viola UNIQUE su username o email
+            error_response = json.dumps({"error": f"Violazione di unicità: {str(e)}"}).encode("utf-8")
+            _set_headers(handler, 400, error_response)
+            handler.wfile.write(error_response)
+            return
     
     new_user = {
         "id": new_id,
         "username": username,
-        "password": password,
         "email": email
     }
     response_data = json.dumps(new_user).encode("utf-8")
@@ -150,13 +165,12 @@ def handle_create_user(handler):
     _set_headers(handler, 201, response_data)
     handler.wfile.write(response_data)
 
-
 def handle_update_user(handler, user_id):
-    """PUT /users/<id> - Aggiorna i campi di un utente."""
+    """PUT /users/<id> - Aggiorna i campi di un utente (username, password, email)."""
     try:
         user_id = int(user_id)
     except ValueError:
-        error_response = json.dumps({"error": "Invalid ID"}).encode("utf-8")
+        error_response = json.dumps({"error": "ID non valido"}).encode("utf-8")
         _set_headers(handler, 400, error_response)
         handler.wfile.write(error_response)
         return
@@ -167,14 +181,14 @@ def handle_update_user(handler, user_id):
     try:
         data = json.loads(body)
     except json.JSONDecodeError:
-        error_response = json.dumps({"error": "Invalid ID"}).encode("utf-8")
+        error_response = json.dumps({"error": "JSON non valido"}).encode("utf-8")
         _set_headers(handler, 400, error_response)
         handler.wfile.write(error_response)
         return
 
     # campi aggiornabili
     username = data.get("username", None)
-    password = data.get("password", None)
+    new_password = data.get("password", None)  # se presente, lo hashiamo
     email = data.get("email", None)
 
     with get_connection() as conn:
@@ -183,28 +197,44 @@ def handle_update_user(handler, user_id):
         c.execute("SELECT id, username, password, email FROM users WHERE id = ?", (user_id,))
         row = c.fetchone()
         if not row:
-            error_response = json.dumps({"error": "User not found"}).encode("utf-8")
+            error_response = json.dumps({"error": "Utente non trovato"}).encode("utf-8")
             _set_headers(handler, 404, error_response)
             handler.wfile.write(error_response)
             return
 
-        existing_id, existing_username, existing_password, existing_email = row
+        existing_id, existing_username, existing_hashed_pw, existing_email = row
+
+        # Se i campi non sono presenti nel JSON, manteniamo quelli esistenti
         updated_username = username if username is not None else existing_username
-        updated_password = password if password is not None else existing_password
         updated_email = email if email is not None else existing_email
 
-        c.execute("""
-            UPDATE users
-            SET username = ?, password = ?, email = ?
-            WHERE id = ?
-        """, (updated_username, updated_password, updated_email, user_id))
-        conn.commit()
+        # Se la password è presente, la hashiamo con bcrypt; altrimenti, manteniamo l'hash esistente
+        if new_password is not None and len(new_password) > 0:
+            hashed_pw = bcrypt.hashpw(new_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+        else:
+            hashed_pw = existing_hashed_pw
+
+        # TENTIAMO l'aggiornamento nel DB
+        try:
+            c.execute("""
+                UPDATE users
+                SET username = ?, password = ?, email = ?
+                WHERE id = ?
+            """, (updated_username, hashed_pw, updated_email, user_id))
+            conn.commit()
+        except sqlite3.IntegrityError as e:
+            # Se scatta errore di UNIQUE su username o email
+            error_response = json.dumps({"error": f"Violazione di unicità: {str(e)}"}).encode("utf-8")
+            _set_headers(handler, 400, error_response)
+            handler.wfile.write(error_response)
+            return
 
     updated_user = {
         "id": user_id,
         "username": updated_username,
-        "password": updated_password,
-        "email": updated_email
+        "email": updated_email,
+        # Non mostrare la password in chiaro
+        # "password": hashed_pw 
     }
     response_data = json.dumps(updated_user).encode("utf-8")
     _set_headers(handler, 200, response_data)
