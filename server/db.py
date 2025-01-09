@@ -13,18 +13,30 @@ def init_db():
     with get_connection() as conn:
         c = conn.cursor()
         
-        # Tabella per le prenotazioni
 
+
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS services (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,         
+            description TEXT,
+            capacity INTEGER,           
+            price REAL,                 
+            active INTEGER NOT NULL DEFAULT 1  
+        );
+        """)
+        # Tabella per le prenotazioni
         
         c.execute("""
         CREATE TABLE IF NOT EXISTS bookings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            customer_name TEXT NOT NULL,
-            date TEXT NOT NULL,
-            service TEXT NOT NULL,
             user_id INTEGER NOT NULL,
-            FOREIGN KEY (user_id) REFERENCES users(id)
-        )
+            service_id INTEGER NOT NULL,
+            date TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            FOREIGN KEY (user_id) REFERENCES users(id),
+            FOREIGN KEY (service_id) REFERENCES services(id)
+        );
         """)
 
         # Tabella per gli utenti
