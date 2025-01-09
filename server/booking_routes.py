@@ -10,19 +10,30 @@ def handle_get_all_bookings(handler):
     """GET /bookings - Ritorna tutte le prenotazioni dal DB."""
     with get_connection() as conn:
         c = conn.cursor()
-        c.execute("SELECT id, customer_name, date, service, user_id FROM bookings")
-        rows = c.fetchall()  # lista di tuple, es: [(1, 'Mario', '2024-12-31', 'Taglio'), ...]
+        c.execute("""
+            SELECT b.id, b.user_id, b.service_id,
+                b.date, b.status,
+                s.name AS service_name, s.description
+            FROM bookings b
+            JOIN services s ON b.service_id = s.id
+        """)
+        rows = c.fetchall()
 
-    # Convertiamo le tuple in dict
-    results = []
-    for row in rows:
-        results.append({
+        results = []
+        # Convertiamo le tuple in dict
+        for row in rows:
+            results.append({
             "id": row[0],
-            "customer_name": row[1],
-            "date": row[2],
-            "service": row[3],
-            "user_id": row[4]
-        })
+            "user_id": row[1],
+            "service_id": row[2],
+            "date": row[3],
+            "status": row[4],
+            "service_name": row[5],
+            "service_description": row[6],
+            })
+
+
+
     response_data = json.dumps(results).encode("utf-8")
     _set_headers(handler, 200, response_data)
     handler.wfile.write(response_data)
@@ -73,13 +84,29 @@ def handle_create_booking(handler):
         return
 
     # Recupera campi dal body
-    customer_name = data.get("customer_name", "")
+
+    # customer_name = data.get("customer_name", "")
+    # service = data.get("service", "")
     date = data.get("date", "")
-    service = data.get("service", "")
     user_id = data.get("user_id", "")
+    service_id = data.get("service_id", None)  # We'll store ID, not text
+    status = data.get("status", "pending") 
+
+
 
     with get_connection() as conn:
         c = conn.cursor()
+
+        # check service_id valido
+        c.execute("SELECT id FROM services WHERE id = ?", (service_id,))
+        service_row = c.fetchone()
+        if service_row is None:
+            error_response = json.dumps({"error": "Service not found"}).encode("utf-8")
+            _set_headers(handler, 404, error_response)
+            handler.wfile.write(error_response)
+            return
+
+        # check user_id valido
         c.execute("SELECT id, username, password, email FROM users WHERE id = ?", (user_id,))
         row = c.fetchone()
         if row is None:
@@ -94,11 +121,12 @@ def handle_create_booking(handler):
             c = conn.cursor()
 
             c.execute("""
-                INSERT INTO bookings (customer_name, date, service,user_id)
+                INSERT INTO bookings (user_id, service_id, date, status)
                 VALUES (?, ?, ?, ?)
-            """, (customer_name, date, service, user_id))
+            """, (user_id, service_id, date, status))
             conn.commit()
-            new_id = c.lastrowid  # ID generato
+            new_id = c.lastrowid
+
     except sqlite3.IntegrityError as e:
         # Se scatta la foreign key o un vincolo di integrità
         error_response= json.dumps({"error": str(e)}).encode("utf-8") 
@@ -111,77 +139,99 @@ def handle_create_booking(handler):
 
     # Costruiamo l'oggetto di risposta
     new_booking = {
-        "id": new_id,
-        "customer_name": customer_name,
-        "date": date,
-        "service": service,
-        "user_id": user_id
+    "id": new_id,
+    "user_id": user_id,
+    "service_id": service_id,
+    "date": date,
+    "status": status
     }
     response_data = json.dumps(new_booking).encode("utf-8")
     _set_headers(handler, 201, response_data)
     handler.wfile.write(response_data)
 
 def handle_update_booking(handler, booking_id):
-    """PUT /bookings/<id> - Aggiorna la prenotazione indicata."""
+    """
+    PUT /bookings/<id> - Aggiorna la prenotazione esistente con i nuovi campi
+    (service_id, status, date, user_id).
+    """
     try:
+        # Convertiamo booking_id in intero
         booking_id = int(booking_id)
     except ValueError:
-        error_response = json.dumps({"error": "Invalid ID"}).encode("utf-8")
+        # Se booking_id non è un intero
+        error_response = json.dumps({"errore": "ID non valido"}).encode("utf-8")
         _set_headers(handler, 400, error_response)
         handler.wfile.write(error_response)
         return
 
+    # Leggiamo il body della richiesta
     content_length = int(handler.headers.get("Content-Length", 0))
     body = handler.rfile.read(content_length).decode("utf-8")
-    
+
+    # Proviamo a fare il parsing del JSON
     try:
         data = json.loads(body)
     except json.JSONDecodeError:
-        error_response = json.dumps({"error": "Invalid JSON"}).encode("utf-8")
+        error_response = json.dumps({"errore": "JSON non valido"}).encode("utf-8")
         _set_headers(handler, 400, error_response)
         handler.wfile.write(error_response)
         return
 
-    # Campi aggiornabili
-    customer_name = data.get("customer_name", None)
-    date = data.get("date", None)
-    service = data.get("service", None)
+    # Recuperiamo i campi (potrebbero essere assenti o None)
     user_id = data.get("user_id", None)
+    service_id = data.get("service_id", None)
+    date = data.get("date", None)
+    status = data.get("status", None)
 
     with get_connection() as conn:
         c = conn.cursor()
-        # Prima recuperiamo la prenotazione esistente (per verificare se c'è)
-        c.execute("SELECT id, customer_name, date, service, user_id FROM bookings WHERE id = ?", (booking_id,))
+        # Verifichiamo se la prenotazione esiste davvero
+        c.execute("""
+            SELECT id, user_id, service_id, date, status
+            FROM bookings
+            WHERE id = ?
+        """, (booking_id,))
         row = c.fetchone()
+
         if not row:
-            error_response = json.dumps({"error": "Booking not found"}).encode("utf-8")
+            # Se la prenotazione non esiste, restituiamo errore 404
+            error_response = json.dumps({"errore": "Prenotazione non trovata"}).encode("utf-8")
             _set_headers(handler, 404, error_response)
             handler.wfile.write(error_response)
             return
-        
-        # Se esiste, costruiamo i campi aggiornati
-        existing_id, existing_name, existing_date, existing_service, existing_user_id = row
-        print(row)
-        updated_name = customer_name if customer_name is not None else existing_name
-        updated_date = date if date is not None else existing_date
-        updated_service = service if service is not None else existing_service
-        updated_user_id = user_id if user_id is not None else existing_user_id
 
+        existing_id, existing_user_id, existing_service_id, existing_date, existing_status = row
+
+        # Se un campo non è presente nel JSON, manteniamo il valore esistente
+        updated_user_id = user_id if user_id is not None else existing_user_id
+        updated_service_id = service_id if service_id is not None else existing_service_id
+        updated_date = date if date is not None else existing_date
+        updated_status = status if status is not None else existing_status
+
+        # Opzionale: si possono aggiungere controlli per updated_user_id e updated_service_id,
+        # ad esempio verificare se esistono utenti/servizi corrispondenti nel DB
+
+        # Eseguiamo l'UPDATE nel database
         c.execute("""
             UPDATE bookings
-            SET customer_name = ?, date = ?, service = ?, user_id = ?
+            SET user_id = ?,
+                service_id = ?,
+                date = ?,
+                status = ?
             WHERE id = ?
-        """, (updated_name, updated_date, updated_service, updated_user_id,  booking_id))
+        """, (updated_user_id, updated_service_id, updated_date, updated_status, booking_id))
         conn.commit()
 
-    # Rispondiamo con la prenotazione aggiornata
+    # Creiamo l'oggetto di risposta con i campi aggiornati
     updated_booking = {
         "id": booking_id,
-        "customer_name": updated_name,
-        "date": updated_date,
-        "service": updated_service,
         "user_id": updated_user_id,
+        "service_id": updated_service_id,
+        "date": updated_date,
+        "status": updated_status
     }
+
+    # Convertiamo in JSON e inviamo la risposta con status 200
     response_data = json.dumps(updated_booking).encode("utf-8")
     _set_headers(handler, 200, response_data)
     handler.wfile.write(response_data)

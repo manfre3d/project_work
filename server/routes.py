@@ -14,6 +14,13 @@ from user_routes import (
     handle_update_user,
     handle_delete_user
 )
+from service_routes import (
+    handle_get_all_services,
+    handle_get_service_by_id,
+    handle_create_service,
+    handle_update_service,
+    handle_delete_service
+)
 def parse_path(path):
     parts = path.strip("/").split("/")
     if len(parts) == 1:
@@ -27,6 +34,27 @@ def parse_path(path):
 
 def route_request(handler, method):
     resource, resource_id = parse_path(handler.path)
+
+    if resource == "services":
+        if resource_id is None:
+            # e.g. /services
+            if method == "GET":
+                handle_get_all_services(handler)
+            elif method == "POST":
+                handle_create_service(handler)
+            else:
+                handle_404(handler)
+        else:
+            # e.g. /services/123
+            if method == "GET":
+                handle_get_service_by_id(handler, resource_id)
+            elif method == "PUT":
+                handle_update_service(handler, resource_id)
+            elif method == "DELETE":
+                handle_delete_service(handler, resource_id)
+            else:
+                handle_404(handler)
+        return
 
     if resource == "bookings":
         if resource_id is None:
