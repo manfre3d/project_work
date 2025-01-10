@@ -45,7 +45,8 @@ def init_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT NOT NULL UNIQUE,
                 password TEXT NOT NULL,
-                email TEXT UNIQUE
+                email TEXT UNIQUE,
+                role TEXT NOT NULL DEFAULT 'user'  -- 'user' o 'admin'
             );
         """)
 
