@@ -4,8 +4,10 @@ import bcrypt
 DATABASE_NAME = "database.db"
 
 def get_connection():
-    """Ritorna una connessione SQLite al file database.db."""
+    """Ritorna una connessione SQLite al file database.db con Row factory."""
     connection = sqlite3.connect(DATABASE_NAME)
+    # Per avere accesso ai campi per nome es. row["id"]
+    connection.row_factory = sqlite3.Row  
     connection.execute("PRAGMA foreign_keys = ON;")
     return connection
 
@@ -55,6 +57,7 @@ def init_db():
          # Creare un amministratore di default se non esiste
         c.execute("SELECT COUNT(*) as count FROM users WHERE role = 'admin'")
         admin_count = c.fetchone()["count"]
+        # print(admin_count)
         if admin_count == 0:
             # Inserire un admin di default
             default_admin_username = "admin"
