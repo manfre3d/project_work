@@ -1,4 +1,5 @@
 import sqlite3
+import bcrypt
 
 DATABASE_NAME = "database.db"
 
@@ -49,5 +50,21 @@ def init_db():
                 role TEXT NOT NULL DEFAULT 'user'  -- 'user' o 'admin'
             );
         """)
+        
+        
+         # Creare un amministratore di default se non esiste
+        c.execute("SELECT COUNT(*) as count FROM users WHERE role = 'admin'")
+        admin_count = c.fetchone()["count"]
+        if admin_count == 0:
+            # Inserire un admin di default
+            default_admin_username = "admin"
+            default_admin_password = bcrypt.hashpw("admin".encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+            default_admin_email = "admin@example.com"
+            c.execute("""
+                INSERT INTO users (username, password, email, role)
+                VALUES (?, ?, ?, 'admin')
+            """, (default_admin_username, default_admin_password, default_admin_email))
+            print("Amministratore di default creato: username='admin', password='adminpassword'")
+        
 
         conn.commit()
