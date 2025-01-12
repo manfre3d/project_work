@@ -1,6 +1,6 @@
 import json
 from db import get_connection
-from utility import _set_headers
+from utility.utility import _set_headers
 
 
 def handle_get_all_services(handler):
