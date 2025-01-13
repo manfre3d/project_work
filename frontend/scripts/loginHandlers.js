@@ -2,6 +2,7 @@ import { loginForm, btnLogout } from "./references.js";
 import { showModal } from "./utility.js";
 import { showSection } from "./navigationHandlers.js";
 import { sectionBookings } from "./references.js";
+import { loadAllBookings } from "./bookingHandlers.js";
 
 export function setupLoginHandler() {
   loginForm.addEventListener("submit", async (e) => {
@@ -32,6 +33,7 @@ export function setupLoginHandler() {
       // mostra il pulsante logout
       btnLogout.style.display = "inline-block";
       // naviga alla sezione prenotazioni
+      await loadAllBookings();
       showSection(sectionBookings);
     } catch (error) {
       console.error("Errore durante il login:", error);
