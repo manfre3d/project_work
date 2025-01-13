@@ -50,17 +50,26 @@ def handle_get_booking_by_id(handler, booking_id):
     
     with get_connection() as conn:
         c = conn.cursor()
-        c.execute("SELECT id, customer_name, date, service, user_id FROM bookings WHERE id = ?", (booking_id,))
+        c.execute("""
+            SELECT 
+                b.id, b.user_id, b.service_id, 
+                b.start_date, b.end_date, b.status, 
+                s.name AS service_name
+            FROM bookings b
+            JOIN services s ON b.service_id = s.id
+            WHERE b.id = ?
+        """, (booking_id,))
         row = c.fetchone()
 
     if row:
         result = {
-            "id": row[0],
-            "customer_name": row[1],
-            "date": row[2],
-            "service": row[3],
-            "user_id": row[4]
-
+            "id": row["id"],
+            "user_id": row["user_id"],
+            "service_id": row["service_id"],
+            "start_date": row["start_date"],
+            "end_date": row["end_date"],
+            "status": row["status"],
+            "service_name": row["service_name"],
         }
         response_data = json.dumps(result).encode("utf-8")
         _set_headers(handler, 200, response_data)
