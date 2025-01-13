@@ -16,8 +16,24 @@ def create_session(user_id, duration_minutes=60):
         conn.commit()
     return session_id
 
+def get_session_id(handler):
+    """
+    Estrae il session_id dai cookie dell'handler.
+    handler: Oggetto handler HTTP.
+    Returns: session_id (str): Il valore del session_id se presente, altrimenti None.
+    """
+    cookies = handler.headers.get("Cookie")
+    if not cookies:
+        return None
+
+    for cookie in cookies.split(";"):
+        key, _, value = cookie.strip().partition("=")
+        if key == "session_id":
+            return value
+    return None
+
 def get_user_id_from_session(session_id):
-    """Recupera l'ID dell'utente associato all'ID di sessione, se non scaduta."""
+    """restituisce l'ID dell'utente associato alla sessione se la sessione è valida, altrimenti None."""
     with get_connection() as conn:
         c = conn.cursor()
         c.execute("""
