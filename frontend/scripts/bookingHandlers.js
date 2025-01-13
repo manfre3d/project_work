@@ -3,7 +3,8 @@ import { showSection } from "./navigationHandlers.js";
 import { sectionBookings } from "./references.js";
 import { showModal } from "./utility.js";
 
-let selectedBookingId = null; // traccia l'id della prenotazione selezionata per l'eliminazione
+// traccia l'id della prenotazione selezionata per modifica/eliminazione
+let selectedBookingId = null; 
 
 /**
  * Carica tutte le prenotazioni dal server e aggiorna la lista nel DOM.
@@ -29,11 +30,11 @@ export async function loadAllBookings() {
 }
 
 /**
- * Aggiorna la lista delle prenotazioni nel DOM.
+ * aggiorna la lista delle prenotazioni nel DOM.
  * @param {Array} bookings - elenco delle prenotazioni dal server.
  */
 function renderBookingList(bookings) {
-  bookingList.innerHTML = ""; // svuota la lista esistente
+  bookingList.innerHTML = "";
 
   bookings.forEach((booking) => {
     const bookingItem = document.createElement("div");
@@ -68,31 +69,96 @@ function attachEventHandlers() {
 }
 
 /**
- * Gestisce la modifica di una prenotazione.
+ * mostra la modale per modificare una prenotazione.
  * @param {Event} event - evento click sul pulsante di modifica.
  */
 async function handleEditBooking(event) {
-  const bookingId = event.target.dataset.id;
+  selectedBookingId = event.target.dataset.id;
 
-  showModal(
-    "Modifica Prenotazione",
-    `La funzionalità di modifica per la prenotazione con ID ${bookingId} sarà presto disponibile.`
-  );
+  try {
+    const response = await fetch(`http://localhost:8000/bookings/${selectedBookingId}`, {
+      method: "GET",
+      credentials: "include",
+    });
+
+    if (!response.ok) {
+      const errMsg = await response.json();
+      throw new Error(errMsg.error || "Errore nel recupero della prenotazione");
+    }
+
+    const booking = await response.json();
+    populateEditModal(booking); // riempi i dati nella modale di modifica
+  } catch (error) {
+    console.error("Errore nel recupero della prenotazione:", error);
+    showModal("Errore", `Impossibile modificare la prenotazione: ${error.message}`);
+  }
 }
 
 /**
- * Mostra la modale di conferma eliminazione.
+ * riempi i dati nella modale di modifica.
+ * @param {Object} booking - dati della prenotazione.
+ */
+function populateEditModal(booking) {
+  document.getElementById("editService").value = booking.service_id;
+  document.getElementById("editStartDate").value = booking.start_date;
+  document.getElementById("editEndDate").value = booking.end_date;
+
+  const editModal = new bootstrap.Modal(document.getElementById("editBookingModal"));
+  editModal.show();
+}
+
+/**
+ * conferma e invia la modifica della prenotazione al server.
+ */
+async function confirmEditBooking() {
+  const updatedBooking = {
+    service_id: document.getElementById("editService").value.trim(),
+    start_date: document.getElementById("editStartDate").value,
+    end_date: document.getElementById("editEndDate").value,
+  };
+
+  try {
+    const response = await fetch(`http://localhost:8000/bookings/${selectedBookingId}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify(updatedBooking),
+    });
+
+    if (!response.ok) {
+      const errMsg = await response.json();
+      throw new Error(errMsg.error || "Errore nella modifica della prenotazione");
+    }
+
+    const editModal = bootstrap.Modal.getInstance(
+      document.getElementById("editBookingModal")
+    );
+    editModal.hide();
+
+    showModal("Prenotazione modificata", "La prenotazione è stata modificata con successo.");
+    loadAllBookings();
+    selectedBookingId = null;
+  } catch (error) {
+    console.error("Errore nella modifica della prenotazione:", error);
+    showModal("Errore", `Impossibile modificare la prenotazione: ${error.message}`);
+  }
+}
+
+/**
+ * mostra la modale di conferma eliminazione.
  * @param {Event} event - evento click sul pulsante di eliminazione.
  */
 async function handleDeleteBooking(event) {
-  selectedBookingId = event.target.dataset.id; // salva l'id della prenotazione da eliminare
+  selectedBookingId = event.target.dataset.id;
 
   const confirmDeleteModal = new bootstrap.Modal(document.getElementById("confirmDeleteModal"));
   confirmDeleteModal.show();
 }
 
 /**
- * Invio della richiesta DELETE al server per eliminare la prenotazione selezionata.
+ * conferma l'eliminazione della prenotazione selezionata.
  */
 async function confirmDeleteBooking() {
   if (!selectedBookingId) return;
@@ -111,12 +177,11 @@ async function confirmDeleteBooking() {
     const confirmDeleteModal = bootstrap.Modal.getInstance(
       document.getElementById("confirmDeleteModal")
     );
-    confirmDeleteModal.hide(); // chiudi la modale
+    confirmDeleteModal.hide();
 
-    // rimuove l'elemento della prenotazione dalla lista senza ricaricare tutto
     document.querySelector(`[data-id="${selectedBookingId}"]`).parentElement.remove();
     showModal("Prenotazione eliminata", "La prenotazione è stata eliminata con successo.");
-    selectedBookingId = null; // resetta l'id della prenotazione
+    selectedBookingId = null;
   } catch (error) {
     console.error("Errore nell'eliminazione della prenotazione:", error);
     showModal("Errore", `Impossibile eliminare la prenotazione: ${error.message}`);
@@ -124,7 +189,7 @@ async function confirmDeleteBooking() {
 }
 
 /**
- * Configura il gestore per la creazione di una nuova prenotazione.
+ * configura il gestore per la creazione di una nuova prenotazione.
  */
 export function setupBookingHandler() {
   formNewBooking.addEventListener("submit", async (e) => {
@@ -159,13 +224,16 @@ export function setupBookingHandler() {
 
       formNewBooking.reset();
       showSection(sectionBookings);
-      loadAllBookings(); // Ricarica la lista delle prenotazioni
+      loadAllBookings();
     } catch (error) {
       console.error("Errore nella creazione della prenotazione:", error);
       showModal("Errore", `Messaggio: ${error.message}`);
     }
   });
 }
+
+// collega il pulsante di conferma modifica nella modale
+document.getElementById("confirmEditBtn").addEventListener("click", confirmEditBooking);
 
 // collega il pulsante di conferma eliminazione nella modale
 document.getElementById("confirmDeleteBtn").addEventListener("click", confirmDeleteBooking);
