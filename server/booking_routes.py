@@ -278,13 +278,23 @@ def handle_delete_booking(handler, booking_id):
         handler.wfile.write(error_response)
         return
 
-    user_id = get_user_id_from_session(handler)
-    if not user_id:
-        error_response = json.dumps({"errore": "Autenticazione richiesta"}).encode("utf-8")
+    # recupera il session_id dai cookie
+    session_id = get_session_id(handler)
+    if not session_id:
+        error_response = json.dumps({"errore": "Sessione non valida o non fornita"}).encode("utf-8")
         _set_headers(handler, 401, error_response)
         handler.wfile.write(error_response)
         return
 
+    # verifica l'utente associato al session_id
+    user_id = get_user_id_from_session(session_id)
+    if not user_id:
+        error_response = json.dumps({"errore": "Sessione scaduta o non valida"}).encode("utf-8")
+        _set_headers(handler, 401, error_response)
+        handler.wfile.write(error_response)
+        return
+
+    # cerca la prenotazione nel database
     with get_connection() as conn:
         c = conn.cursor()
         c.execute("""
@@ -306,6 +316,7 @@ def handle_delete_booking(handler, booking_id):
             handler.wfile.write(error_response)
             return
 
+        # elimina la prenotazione
         c.execute("DELETE FROM bookings WHERE id = ?", (booking_id,))
         conn.commit()
 
