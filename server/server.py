@@ -29,38 +29,71 @@ class MyHandler(BaseHTTPRequestHandler):
         base_path = os.path.join(os.getcwd(), "frontend")
         requested_path = self.path.lstrip("/")  # Rimuovi il prefisso "/"
 
+        # aggiungi log per il percorso richiesto
+        print(f"Richiesta file statico: {requested_path}")
+
         # serve index.html di default se la richiesta punta a una directory o root
-        if requested_path == "" or requested_path == "frontend" or requested_path.endswith("/"):
+        if requested_path == "" or requested_path.endswith("/"):
             requested_path = os.path.join(requested_path, "index.html")
-        
+
+        # costruisce il percorso assoluto del file richiesto
         file_path = os.path.join(base_path, requested_path)
 
         # verifica se il file esiste
         if os.path.isfile(file_path):
-            self.send_response(200)
-            # determina il Content-Type in base all'estensione del file
-            if file_path.endswith(".html"):
-                content_type = "text/html"
-            elif file_path.endswith(".css"):
-                content_type = "text/css"
-            elif file_path.endswith(".js"):
-                content_type = "application/javascript"
-            else:
-                content_type = "application/octet-stream"
+            try:
+                with open(file_path, "rb") as f:
+                    file_content = f.read()
 
-            self.send_header("Content-Type", content_type)
-            with open(file_path, "rb") as f:
-                file_content = f.read()
+                self.send_response(200)
+
+                # determina il content-type in base all'estensione del file
+                content_type = self._get_content_type(file_path)
+                self.send_header("Content-Type", content_type)
+
                 # lunghezza del contenuto del file
-                self.send_header("Content-Length", str(len(file_content)))  
+                self.send_header("Content-Length", str(len(file_content)))
                 self.end_headers()
                 self.wfile.write(file_content)
+                print(f"Servito file statico: {file_path}")
+
+            except Exception as e:
+                print(f"Errore durante il caricamento del file statico: {e}")
+                error_response = json.dumps({"error": "Errore interno del server"}).encode("utf-8")
+                self._send_error(500, error_response)
         else:
             # se il file non esiste, restituisci un 404
+            print(f"File non trovato: {file_path}")
             error_response = json.dumps({"error": "File non trovato"}).encode("utf-8")
-            
-            _set_headers(self, 404,error_response)
-            self.wfile.write(error_response)
+            self._send_error(404, error_response)
+
+    def _get_content_type(self, file_path):
+        """Determina il Content-Type in base all'estensione del file."""
+        if file_path.endswith(".html"):
+            return "text/html"
+        elif file_path.endswith(".css"):
+            return "text/css"
+        elif file_path.endswith(".js"):
+            return "application/javascript"
+        elif file_path.endswith(".png"):
+            return "image/png"
+        elif file_path.endswith(".jpg") or file_path.endswith(".jpeg"):
+            return "image/jpeg"
+        elif file_path.endswith(".gif"):
+            return "image/gif"
+        elif file_path.endswith(".svg"):
+            return "image/svg+xml"
+        elif file_path.endswith(".ico"):
+            return "image/x-icon"
+        return "application/octet-stream"
+
+    def _send_error(self, code, message):
+        """Invia un messaggio di errore al client."""
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(message)))
+        self.end_headers()
+        self.wfile.write(message)
 
 
     def do_POST(self):
