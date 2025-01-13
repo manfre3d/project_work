@@ -1,68 +1,48 @@
-/* Body con sfondo gradiente */
+/* styling generale del body */
 body {
   margin: 0;
   font-family: "Roboto", Arial, sans-serif;
-  /* Sfondi gradiente */
-  background: linear-gradient(
-    135deg,
-    rgba(242, 246, 248, 1) 0%,
-    rgba(224, 239, 248, 1) 100%
-  );
+  background: linear-gradient(135deg, rgba(242, 246, 248, 1) 0%, rgba(224, 239, 248, 1) 100%);
   min-height: 100vh;
 }
 
-/* Navbar brand: aggiunge un tocco di ombra */
+/* navbar: branding con un tocco di ombra */
 .navbar-brand {
   font-weight: 600;
   letter-spacing: 0.5px;
   text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.15);
 }
 
-/* Title del sito (se usi un <h1> in body) */
-h1 {
-  font-weight: 700;
-  letter-spacing: 1px;
-  color: #2c3e50;
-  text-shadow: 1px 1px 2px #bbb;
-}
-
-/* Miglioriamo i button di login, logout, prenotazioni, ecc. */
+/* navbar: transizione su pulsanti */
 .navbar-nav button {
   margin: 0 0.2rem;
   font-weight: 500;
   transition: transform 0.1s ease;
 }
 
-/* Hover effect sui bottoni nella navbar */
+/* effetto hover sui pulsanti della navbar */
 .navbar-nav button:hover {
   transform: scale(1.05);
 }
 
-/* Esempio di override colore pulsante login se vuoi */
+/* stile del pulsante di login */
 #btn-login {
   color: #fff !important;
-  background-color: #ff6600 !important; /* un arancione */
+  background-color: #ff6600 !important;
   border-color: #ff6600 !important;
   padding: 0.5em;
 }
+
+/* hover sul pulsante di login */
 #btn-login:hover {
   background-color: #e65c00 !important;
   border-color: #e65c00 !important;
 }
 
-/* Sezione di default hidden: usiamo la classe .active per mostrarle */
+/* stile delle sezioni nascoste di default */
 section {
   display: none;
-}
-
-/* Rendi visibile la sezione quando ha la classe .active */
-.active {
-  display: block;
-}
-
-/* Contenitore delle sezioni: card-like con ombra */
-section {
-  background-color: #ffffffcc; /* bianco con un tocco di trasparenza */
+  background-color: #ffffffcc;
   backdrop-filter: blur(4px);
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
@@ -70,126 +50,192 @@ section {
   margin-bottom: 2rem;
 }
 
-/* Form di login e prenotazioni */
+/* mostra una sezione attiva */
+.active {
+  display: block;
+}
+
+/* stile per gli heading principali */
+h1 {
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #2c3e50;
+  text-shadow: 1px 1px 2px #bbb;
+}
+
+/* stile generale dei form */
 form {
   display: flex;
   flex-direction: column;
   gap: 1rem;
 }
 
-/* Input personalizzati */
+/* input dei form con bordo personalizzato */
 form input.form-control {
   border: 2px solid #ccc;
   border-radius: 6px;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-/* Hover e focus sugli input */
+/* hover sugli input */
 form input.form-control:hover {
   border-color: #aaa;
 }
+
+/* focus sugli input */
 form input.form-control:focus {
   border-color: #007bff;
   box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
 }
 
-/* Bottoni dei form */
+/* bottoni all'interno dei form */
 form button.btn {
   border-radius: 6px;
   font-weight: 600;
   text-transform: uppercase;
 }
 
-/* Booking list style */
+/* lista delle prenotazioni */
 .booking-list {
   margin-top: 1rem;
-}
-.booking-list ul {
-  list-style: none;
-  padding-left: 0;
-}
-.booking-list li {
-  background-color: #fafafa;
-  padding: 0.8rem;
-  margin-bottom: 0.5rem;
-  border-radius: 4px;
-  border-left: 3px solid #007bff;
-  transition: background-color 0.2s;
-}
-.booking-list li:hover {
-  background-color: #f0f0f0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
-/* Modale: puoi personalizzare il colore e ombra */
-/* Modal custom animation (entrata/uscita) */
+/* ogni elemento della lista prenotazioni */
+.booking-item {
+  background-color: #ffffff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 15px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+/* effetto hover sugli elementi della lista */
+.booking-item:hover {
+  transform: scale(1.02);
+  box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* titolo all'interno di ogni prenotazione */
+.booking-item h3 {
+  margin: 0 0 10px;
+  font-size: 1.2rem;
+  color: #333;
+}
+
+/* paragrafi all'interno delle prenotazioni */
+.booking-item p {
+  margin: 5px 0;
+  font-size: 0.95rem;
+  color: #555;
+}
+
+/* bottoni di modifica ed eliminazione */
+.booking-item button {
+  margin-right: 10px;
+}
+
+/* pulsante di modifica */
+.btn-edit {
+  background-color: #007bff;
+  color: #fff;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+/* hover sul pulsante di modifica */
+.btn-edit:hover {
+  background-color: #0056b3;
+}
+
+/* pulsante di eliminazione */
+.btn-delete {
+  background-color: #dc3545;
+  color: #fff;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+/* hover sul pulsante di eliminazione */
+.btn-delete:hover {
+  background-color: #a71d2a;
+}
+
+/* animazione per le modali */
 .modal.fade .modal-dialog {
   transform: translateY(-30px);
   opacity: 0;
   transition: transform 0.3s ease-out, opacity 0.3s ease-out;
 }
+
+/* animazione visibile per le modali */
 .modal.fade.show .modal-dialog {
   transform: translateY(0);
   opacity: 1;
 }
 
-/* Ombra più accentuata e bordi arrotondati */
+/* contenitore della modale */
 .modal-content {
   border-radius: 10px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
 }
 
-/* Header colorato (override di default) */
+/* header della modale */
 .modal-header {
-  background: linear-gradient(
-    135deg,
-    #007bff 0%,
-    #0056b3 100%
-  );
+  background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
   color: #fff;
   border-top-left-radius: 10px;
   border-top-right-radius: 10px;
-  /* Se vuoi più spazio */
   padding: 1rem 1.5rem;
 }
 
-/* Cambia il colore del titolo se preferisci */
+/* titolo della modale */
 .modal-title {
   font-weight: 600;
   letter-spacing: 0.5px;
 }
 
-/* Bottone chiudi */
+/* pulsante chiudi nella modale */
 .modal-header .btn-close {
-  filter: invert(1); /* Per rendere l'icona X bianca */
+  filter: invert(1);
   opacity: 0.8;
 }
+
+/* hover sul pulsante chiudi della modale */
 .modal-header .btn-close:hover {
   opacity: 1;
 }
 
-/* Corpo */
+/* corpo della modale */
 .modal-body {
-  min-height: 100px; /* se vuoi un minimo di altezza */
+  min-height: 100px;
   padding: 1.5rem;
 }
 
-/* Footer */
+/* footer della modale */
 .modal-footer {
   border-bottom-left-radius: 10px;
   border-bottom-right-radius: 10px;
-  /* Gradient su footer, se vuoi */
   background: #f8f9fa;
   padding: 1rem 1.5rem;
 }
 
-/* Pulsante “Conferma” */
+/* pulsante di conferma nella modale */
 #modalConfirmBtn {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   transition: transform 0.1s ease;
 }
+
+/* hover sul pulsante di conferma nella modale */
 #modalConfirmBtn:hover {
   transform: scale(1.03);
 }
-
