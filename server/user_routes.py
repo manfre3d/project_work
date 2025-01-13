@@ -26,7 +26,7 @@ def handle_login(handler):
         handler.wfile.write(error_bytes)
         return
 
-    # Cerca l'utente nel database
+    # ricerca dell'utente nel database
     with get_connection() as conn:
         c = conn.cursor()
         c.execute("""
@@ -46,10 +46,10 @@ def handle_login(handler):
     user_id, db_username, db_hashed_pw, email, role = row
     print(f"Utente trovato: {db_username}, Ruolo: {role}")
 
-    # Verifica la password
+    # controllo per password, bcrypt.checkpw ritorna True se la password è corretta
     if bcrypt.checkpw(password.encode("utf-8"), db_hashed_pw.encode("utf-8")):
         print(f"Password corretta per l'utente: {username}")
-        # Password corretta, crea sessione
+        # password corretta, crea sessione nel database e la gestisce nel be
         session_id = create_session(user_id)
         print(f"Sessione creata: {session_id}")
         
@@ -62,12 +62,15 @@ def handle_login(handler):
         }
         response_data = json.dumps(user_obj).encode("utf-8")
         
-        # Header extra per Set-Cookie
+        # header extra per Set-Cookie per passare il session_id al fe una volta
+        # loggato nei cookie l'fe lo salva ed è possibile fare richieste successive 
+        # al server e il resto delle richieste saranno autenticate
+        
         extra_headers = {
             "Set-Cookie": f"session_id={session_id}; HttpOnly; Path=/"
         }
         
-        # Utilizza _set_headers con gli extra_headers
+        #tramite metodo set headers impostiamo header extra necessari per passare il session_id al fe
         _set_headers(handler, 200, response_data, extra_headers=extra_headers)
         handler.wfile.write(response_data)
     else:
@@ -81,11 +84,7 @@ def handle_logout(handler):
     cookies = handler.headers.get("Cookie")
     if not cookies:
         error_response = json.dumps({"error": "Nessuna sessione attiva"}).encode("utf-8")
-        _set_headers(
-            handler,
-            code=400,
-            response_data=error_response
-        )
+        _set_headers(handler, 400, error_response)
         handler.wfile.write(error_response)
         return
 
@@ -97,17 +96,13 @@ def handle_logout(handler):
 
     if not session_id:
         error_response = json.dumps({"error": "Nessuna sessione attiva"}).encode("utf-8")
-        _set_headers(
-            handler,
-            code=400,
-            response_data=error_response
-        )
+        _set_headers(handler, 400, error_response)
         handler.wfile.write(error_response)
         return
 
     delete_session(session_id)
 
-    # Imposta il cookie di sessione come scaduto
+    # imposta il cookie di sessione come scaduto (normalmente si utilizza con la funzione logout)
     response_data = json.dumps({"message": "Logout effettuato con successo"}).encode("utf-8")
     extra_headers = {
         "Set-Cookie": "session_id=; HttpOnly; Path=/; Max-Age=0"
@@ -129,7 +124,8 @@ def handle_get_all_users(handler):
         handler.wfile.write(error_response)
         return
 
-    # Autorizzazione: Solo admin possono vedere tutti gli utenti
+    # tramite autorizzazione, permette solo agli utenti con ruolo admin
+    # di vedere tutti gli utenti
     if authenticated_user["role"] != "admin":
         error_response = json.dumps({"error": "Autorizzazione richiesta"}).encode("utf-8")
         _set_headers(handler, 403, error_response)
@@ -174,7 +170,7 @@ def authenticate(handler):
         user_id = get_user_id_from_session(session_id)
         if not user_id:
             return None
-        # Recupera i dettagli dell'utente
+        # recuprera i dettagli dell'utente tramite l'id della sessione sfruttando la relazione delle tabelle a db
         c.execute("SELECT id, username, email, role FROM users WHERE id = ?", (user_id,))
         row = c.fetchone()
         if row:
@@ -233,11 +229,11 @@ def handle_create_user(handler):
 
     # dati utente
     username = data.get("username", "")
-    # password in chiaro
+    # password dell'utente prima del hashing
     password = data.get("password", "")
     email = data.get("email", "")
 
-    # Hash password tramite bcrypt
+    # hashing della  password tramite l'utililizzo di bcrypt
     hashed_pw = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
     with get_connection() as conn:
@@ -250,7 +246,7 @@ def handle_create_user(handler):
             conn.commit()
             new_id = c.lastrowid
         except sqlite3.IntegrityError as e:
-            # Se viola UNIQUE su username o email
+            # error per gestire violazioni UNIQUE su username o email
             error_response = json.dumps({"error": f"Violazione di unicità: {str(e)}"}).encode("utf-8")
             _set_headers(handler, 400, error_response)
             handler.wfile.write(error_response)
@@ -287,14 +283,15 @@ def handle_update_user(handler, user_id):
         handler.wfile.write(error_response)
         return
 
-    # campi aggiornabili
+    # campi aggiornabili dell'user
     username = data.get("username", None)
-    new_password = data.get("password", None)  # se presente, lo hashiamo
+    # nuova password da aggiornare prima che venga hashata
+    new_password = data.get("password", None)
     email = data.get("email", None)
 
     with get_connection() as conn:
         c = conn.cursor()
-        # Verifichiamo se l'utente esiste
+        # check per vedere se l'utente esiste nel db
         c.execute("SELECT id, username, password, email FROM users WHERE id = ?", (user_id,))
         row = c.fetchone()
         if not row:
@@ -305,17 +302,18 @@ def handle_update_user(handler, user_id):
 
         existing_id, existing_username, existing_hashed_pw, existing_email = row
 
-        # Se i campi non sono presenti nel JSON, manteniamo quelli esistenti
+        # se i campi non sono presenti manteniamo i valori esistendi
         updated_username = username if username is not None else existing_username
         updated_email = email if email is not None else existing_email
 
-        # Se la password è presente, la hashiamo con bcrypt; altrimenti, manteniamo l'hash esistente
+        # processo per la password qualora presente. viene hashata con bcrypt
+        # se non presente si mantiene la password esistente
         if new_password is not None and len(new_password) > 0:
             hashed_pw = bcrypt.hashpw(new_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
         else:
             hashed_pw = existing_hashed_pw
 
-        # TENTIAMO l'aggiornamento nel DB
+        # andiamo ad aggiornare il DB
         try:
             c.execute("""
                 UPDATE users
@@ -324,7 +322,7 @@ def handle_update_user(handler, user_id):
             """, (updated_username, hashed_pw, updated_email, user_id))
             conn.commit()
         except sqlite3.IntegrityError as e:
-            # Se scatta errore di UNIQUE su username o email
+            # gestiamo errori per violazioni di tipo UNIQUE su username o email
             error_response = json.dumps({"error": f"Violazione di unicità: {str(e)}"}).encode("utf-8")
             _set_headers(handler, 400, error_response)
             handler.wfile.write(error_response)
@@ -334,7 +332,7 @@ def handle_update_user(handler, user_id):
         "id": user_id,
         "username": updated_username,
         "email": updated_email,
-        # Non mostrare la password in chiaro
+        # rimosso la password per motivi di sicurezza anche se hashata
         # "password": hashed_pw 
     }
     response_data = json.dumps(updated_user).encode("utf-8")
@@ -353,7 +351,7 @@ def handle_delete_user(handler, user_id):
 
     with get_connection() as conn:
         c = conn.cursor()
-        # Controlliamo se l'utente esiste
+        # check per vedere se l'utente esiste
         c.execute("SELECT id FROM users WHERE id = ?", (user_id,))
         row = c.fetchone()
         if not row:

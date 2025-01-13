@@ -1,30 +1,43 @@
 import json
 from db import get_connection
 from utility.utility import _set_headers
+from utility.session import get_user_id_from_session, clean_expired_sessions
+from utility.session import get_user_id_from_session
+from utility.session import get_user_id_from_session
 
+def authenticate(handler):
+    """Funzione di autenticazione comune."""
+    from user_routes import authenticate as user_authenticate
+    return user_authenticate(handler)
 
 def handle_get_all_services(handler):
     """
     GET /services - Ritorna tutti i servizi dal DB.
     """
+    authenticated_user = authenticate(handler)
+    if not authenticated_user:
+        error_response = json.dumps({"error": "Autenticazione richiesta"}).encode("utf-8")
+        _set_headers(handler, 401, error_response)
+        handler.wfile.write(error_response)
+        return
+
     with get_connection() as conn:
         c = conn.cursor()
         c.execute("""
             SELECT id, name, description, capacity, price, active
             FROM services
         """)
-        rows = c.fetchall()  # e.g. [(1, "Camera Singola", "...", 2, 45.0, 1), ...]
+        rows = c.fetchall()
 
-    # Convert tuples to dict
     results = []
     for row in rows:
         results.append({
-            "id": row[0],
-            "name": row[1],
-            "description": row[2],
-            "capacity": row[3],
-            "price": row[4],
-            "active": bool(row[5])  # or keep it as int if you prefer
+            "id": row["id"],
+            "name": row["name"],
+            "description": row["description"],
+            "capacity": row["capacity"],
+            "price": row["price"],
+            "active": bool(row["active"])
         })
 
     response_data = json.dumps(results).encode("utf-8")
@@ -91,7 +104,9 @@ def handle_create_service(handler):
     description = data.get("description", "")
     capacity = data.get("capacity", 0)
     price = data.get("price", 0.0)
-    active = data.get("active", 1)  # 1 = attivo, 0 = inattivo
+    # se non è specificato, il servizio è attivo di default
+    # active = 1 altrimenti 0
+    active = data.get("active", 1)  
 
     with get_connection() as conn:
         c = conn.cursor()
@@ -147,7 +162,7 @@ def handle_update_service(handler, service_id):
 
     with get_connection() as conn:
         c = conn.cursor()
-        # Check if the service exists
+        #check per vedere se il servizio richiesto esiste
         c.execute("""
             SELECT id, name, description, capacity, price, active
             FROM services
@@ -202,7 +217,7 @@ def handle_delete_service(handler, service_id):
 
     with get_connection() as conn:
         c = conn.cursor()
-        # Controlliamo se il servizio esiste
+        # check se il servizio esiste
         c.execute("SELECT id FROM services WHERE id = ?", (service_id,))
         row = c.fetchone()
         if not row:
@@ -211,7 +226,7 @@ def handle_delete_service(handler, service_id):
             handler.wfile.write(error_response)
             return
 
-        # Esempio: real delete
+        # procediamo con la delete del servizio
         c.execute("DELETE FROM services WHERE id = ?", (service_id,))
         conn.commit()
 
