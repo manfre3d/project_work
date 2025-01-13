@@ -239,3 +239,19 @@ form button.btn {
 #modalConfirmBtn:hover {
   transform: scale(1.03);
 }
+
+/* personalizzazione della modale di conferma */
+#confirmDeleteModal .modal-header {
+  background-color: #dc3545;
+  color: #fff;
+}
+
+#confirmDeleteModal .modal-footer .btn-secondary {
+  background-color: #6c757d;
+  color: #fff;
+}
+
+#confirmDeleteModal .modal-footer .btn-danger {
+  background-color: #dc3545;
+  color: #fff;
+}
