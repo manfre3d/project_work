@@ -4,18 +4,22 @@ import { setupBookingHandler } from "./bookingHandlers.js";
 import { sectionLogin } from "./references.js";
 
 function init() {
-  // Imposto i listener sui pulsanti di navigazione
+
+  // collego i pulsanti della navigazione ai relativi gestori/handler
   setupNavHandlers();
 
-  // Imposto l'handler per il login
+  // handler per il form di login
   setupLoginHandler();
 
-  // Imposto l'handler per form prenotazioni
+  //handler per il pulsante di logout
+  setupLogoutHandler();
+  
+  // handler per il form di prenotazione
   setupBookingHandler();
 
-  // Mostro la sezione login all'avvio
+  // mostro la sezione di login all'avvio
   showSection(sectionLogin);
 }
 
-// Avvio l'inizializzazione
+// inizializzazione
 init();

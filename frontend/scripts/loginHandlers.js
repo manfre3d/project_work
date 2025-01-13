@@ -1,8 +1,7 @@
-import { loginForm, btnLogout, setCurrentUserId } from "./references.js";
+import { loginForm, btnLogout } from "./references.js";
+import { showModal } from "./utility.js";
 import { showSection } from "./navigationHandlers.js";
-import { loadAllBookings } from "./bookingHandlers.js";
 import { sectionBookings } from "./references.js";
-import { showModal, capitalizeFirstLetter } from "./utility.js";
 
 export function setupLoginHandler() {
   loginForm.addEventListener("submit", async (e) => {
@@ -12,36 +11,55 @@ export function setupLoginHandler() {
     const password = document.getElementById("password").value.trim();
 
     try {
-      console.log("Inviando POST /login");
       const response = await fetch("http://localhost:8000/login", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
-        // necessario per il funzionamento dei cookie/credenziali
+        // invia automaticamente il cookie di sessione gestito nel backend al server
         credentials: "include", 
         body: JSON.stringify({ username, password }),
       });
-      console.log("Risposta ricevuta:", response);
+
       if (!response.ok) {
         const errMsg = await response.json();
-        throw new Error(errMsg.error || "Login fallito");
+        throw new Error(errMsg.error || "Errore durante il login");
       }
 
       const userData = await response.json();
-      // userData = { id, username, email, role, message }
 
-      setCurrentUserId(userData.id);
-      showModal(
-        `Login effettuato!`, `Bentornato, ${capitalizeFirstLetter(userData.username)}!`
-      );
-
-      btnLogout.style.display = "inline-block";
-      showSection(sectionBookings);
-      loadAllBookings();
+      showModal("Login effettuato", `Bentornato, ${userData.username}!`);
+      // mostra il pulsante logout
+      btnLogout.style.display = "inline-block"; 
+      // naviga alla sezione prenotazioni
+      showSection(sectionBookings); 
     } catch (error) {
-      console.error("Errore login:", error);
-      showModal("Attenzione", `Errore nel login: ${error.message}`);
+      console.error("Errore durante il login:", error);
+      showModal("Errore", `Login fallito: ${error.message}`);
     }
+  });
+}
+export function setupLogoutHandler() {
+  const btnLogout = document.getElementById("btnLogout");
+  btnLogout.addEventListener("click", async () => {
+      try {
+          const response = await fetch("http://localhost:8000/logout", {
+              method: "POST",
+              credentials: "include", 
+          });
+
+          if (!response.ok) {
+              const errMsg = await response.json();
+              throw new Error(errMsg.error || "Errore durante il logout");
+          }
+
+          showModal("Logout effettuato", "Sei stato disconnesso con successo.");
+          btnLogout.style.display = "none"; 
+          // naviga alla sezione login dopo il logout
+          showSection(sectionLogin);
+      } catch (error) {
+          console.error("Errore durante il logout:", error);
+          showModal("Errore", `Logout fallito: ${error.message}`);
+      }
   });
 }
