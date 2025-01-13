@@ -27,15 +27,38 @@ function handleBtnLoginClick() {
 }
 
 function handleBtnLogoutClick() {
-  setCurrentUserId(null);
-  showModal("Logout effettuato", "Arrivederci!");
-  btnLogout.style.display = "none";
-  showSection(sectionLogin);
+  setupLogoutHandler();
 }
+function setupLogoutHandler() {
+  btnLogout.addEventListener("click", async () => {
+    try {
+      const response = await fetch("http://localhost:8000/logout", {
+        method: "POST",
+        credentials: "include", 
+      });
 
+      if (!response.ok) {
+        const errMsg = await response.json();
+        throw new Error(errMsg.error || "Errore durante il logout");
+      }
+
+      // Se il logout ha successo, rimuovi l'utente corrente
+      setCurrentUserId(null);
+      showModal("Logout effettuato", "Sei stato disconnesso con successo.");
+      // nascondiamo il pulsante logout poiché l'utente è stato disconnesso
+      btnLogout.style.display = "none"; 
+       // mostra di nuova la sezione di login
+      showSection(sectionLogin);
+    } catch (error) {
+      console.error("Errore logout:", error);
+      showModal("Errore", `Errore nel logout: ${error.message}`);
+    }
+  });
+}
 function handleBtnBookingsClick() {
   showSection(sectionBookings);
-  loadAllBookings(); // carica e mostra tutte le prenotazioni
+  // carica e mostra tutte le prenotazioni
+  loadAllBookings();
 }
 
 function handleBtnNewBookingClick() {
@@ -47,7 +70,7 @@ function handleBtnNewBookingClick() {
   showSection(sectionNewBooking);
 }
 
-// Funzione che collega i pulsanti ai loro handler
+// funzione che collega i pulsanti della navigazione ai relativi gestori/handler
 export function setupNavHandlers() {
   btnLogin.addEventListener("click", handleBtnLoginClick);
   btnLogout.addEventListener("click", handleBtnLogoutClick);

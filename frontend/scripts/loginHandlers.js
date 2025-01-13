@@ -1,5 +1,4 @@
 import { loginForm, btnLogout, setCurrentUserId } from "./references.js";
-
 import { showSection } from "./navigationHandlers.js";
 import { loadAllBookings } from "./bookingHandlers.js";
 import { sectionBookings } from "./references.js";
@@ -13,26 +12,28 @@ export function setupLoginHandler() {
     const password = document.getElementById("password").value.trim();
 
     try {
+      console.log("Inviando POST /login");
       const response = await fetch("http://localhost:8000/login", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type": "application/json"
         },
+        // necessario per il funzionamento dei cookie/credenziali
+        credentials: "include", 
         body: JSON.stringify({ username, password }),
       });
-
+      console.log("Risposta ricevuta:", response);
       if (!response.ok) {
         const errMsg = await response.json();
         throw new Error(errMsg.error || "Login fallito");
       }
 
       const userData = await response.json();
-      // userData = { id, username, email, message }
+      // userData = { id, username, email, role, message }
 
       setCurrentUserId(userData.id);
-      // (ID=${userData.id})
       showModal(
-        `Login effettuato!`,`Bentornato, ${capitalizeFirstLetter(userData.username)}!`
+        `Login effettuato!`, `Bentornato, ${capitalizeFirstLetter(userData.username)}!`
       );
 
       btnLogout.style.display = "inline-block";
@@ -40,7 +41,7 @@ export function setupLoginHandler() {
       loadAllBookings();
     } catch (error) {
       console.error("Errore login:", error);
-      showModal("Attenzione",`Errore nel login: ${error.message}`);
+      showModal("Attenzione", `Errore nel login: ${error.message}`);
     }
   });
 }
