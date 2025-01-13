@@ -210,6 +210,75 @@
       </div>
     </div>
 
+    <div
+      class="modal fade"
+      id="editBookingModal"
+      tabindex="-1"
+      aria-labelledby="editBookingLabel"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="editBookingLabel">
+              Modifica Prenotazione
+            </h5>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+              aria-label="Chiudi"
+            ></button>
+          </div>
+          <div class="modal-body">
+            <form id="editBookingForm">
+              <div class="mb-3">
+                <label for="editService" class="form-label">Servizio:</label>
+                <input
+                  type="text"
+                  id="editService"
+                  class="form-control"
+                  required
+                />
+              </div>
+              <div class="mb-3">
+                <label for="editStartDate" class="form-label"
+                  >Data Inizio:</label
+                >
+                <input
+                  type="date"
+                  id="editStartDate"
+                  class="form-control"
+                  required
+                />
+              </div>
+              <div class="mb-3">
+                <label for="editEndDate" class="form-label">Data Fine:</label>
+                <input
+                  type="date"
+                  id="editEndDate"
+                  class="form-control"
+                  required
+                />
+              </div>
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              data-bs-dismiss="modal"
+            >
+              Annulla
+            </button>
+            <button type="button" id="confirmEditBtn" class="btn btn-primary">
+              Salva Modifiche
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- JavaScript: il tuo main.js come modulo -->
     <script src="scripts/main.js" type="module"></script>
 
