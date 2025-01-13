@@ -1,6 +1,7 @@
 import json
 import sqlite3
 from db import get_connection
+from utility.session import get_session_id, get_user_id_from_session
 from utility.utility import (
     _set_headers
 )
@@ -124,7 +125,6 @@ def handle_create_booking(handler):
     _set_headers(handler, 201, response_data)
     handler.wfile.write(response_data)
     
-    
 def _validate_booking_data(data):
     """Valida i dati della prenotazione e converte le date."""
     required_fields = ["user_id", "service_id", "start_date", "end_date"]
@@ -190,115 +190,125 @@ def _send_error(handler, code, message):
     handler.wfile.write(error_response)
 def handle_update_booking(handler, booking_id):
     """
-    PUT /bookings/<id> - Aggiorna la prenotazione esistente con i nuovi campi
-    (service_id, status, date, user_id).
+    PUT /bookings/<id> - Aggiorna la prenotazione esistente.
     """
+    # ottieni il session_id
+    session_id = get_session_id(handler)
+    if not session_id:
+        error_response = json.dumps({"error": "Sessione non valida o non fornita"}).encode("utf-8")
+        _set_headers(handler, 401, error_response)
+        handler.wfile.write(error_response)
+        return
+
+    # verifica l'utente associato alla sessione
+    user_id = get_user_id_from_session(session_id)
+    if not user_id:
+        error_response = json.dumps({"error": "Sessione scaduta o non valida"}).encode("utf-8")
+        _set_headers(handler, 401, error_response)
+        handler.wfile.write(error_response)
+        return
+
+    # logica per aggiornare la prenotazione
     try:
-        # Convertiamo booking_id in intero
         booking_id = int(booking_id)
     except ValueError:
-        # Se booking_id non è un intero
-        error_response = json.dumps({"errore": "ID non valido"}).encode("utf-8")
+        error_response = json.dumps({"error": "ID non valido"}).encode("utf-8")
         _set_headers(handler, 400, error_response)
         handler.wfile.write(error_response)
         return
 
-    # Leggiamo il body della richiesta
     content_length = int(handler.headers.get("Content-Length", 0))
     body = handler.rfile.read(content_length).decode("utf-8")
 
-    # Proviamo a fare il parsing del JSON
     try:
         data = json.loads(body)
     except json.JSONDecodeError:
-        error_response = json.dumps({"errore": "JSON non valido"}).encode("utf-8")
+        error_response = json.dumps({"error": "JSON non valido"}).encode("utf-8")
         _set_headers(handler, 400, error_response)
         handler.wfile.write(error_response)
         return
 
-    # Recuperiamo i campi (potrebbero essere assenti o None)
-    user_id = data.get("user_id", None)
-    service_id = data.get("service_id", None)
-    date = data.get("date", None)
-    status = data.get("status", None)
+    service_id = data.get("service_id")
+    start_date = data.get("start_date")
+    end_date = data.get("end_date")
+    status = data.get("status")
 
     with get_connection() as conn:
         c = conn.cursor()
-        # Verifichiamo se la prenotazione esiste davvero
         c.execute("""
-            SELECT id, user_id, service_id, date, status
-            FROM bookings
-            WHERE id = ?
-        """, (booking_id,))
+            SELECT * FROM bookings WHERE id = ? AND user_id = ?
+        """, (booking_id, user_id))
         row = c.fetchone()
 
         if not row:
-            # Se la prenotazione non esiste, restituiamo errore 404
+            error_response = json.dumps({"error": "Prenotazione non trovata"}).encode("utf-8")
+            _set_headers(handler, 404, error_response)
+            handler.wfile.write(error_response)
+            return
+
+        updated_service_id = service_id or row["service_id"]
+        updated_start_date = start_date or row["start_date"]
+        updated_end_date = end_date or row["end_date"]
+        updated_status = status or row["status"]
+
+        c.execute("""
+            UPDATE bookings
+            SET service_id = ?, start_date = ?, end_date = ?, status = ?
+            WHERE id = ? AND user_id = ?
+        """, (updated_service_id, updated_start_date, updated_end_date, updated_status, booking_id, user_id))
+        conn.commit()
+
+    response_data = {
+        "id": booking_id,
+        "service_id": updated_service_id,
+        "start_date": updated_start_date,
+        "end_date": updated_end_date,
+        "status": updated_status
+    }
+    _set_headers(handler, 200, json.dumps(response_data).encode("utf-8"))
+    handler.wfile.write(json.dumps(response_data).encode("utf-8"))
+    
+def handle_delete_booking(handler, booking_id):
+    """DELETE /bookings/<id> - Elimina una prenotazione."""
+    try:
+        booking_id = int(booking_id)
+    except ValueError:
+        error_response = json.dumps({"errore": "ID prenotazione non valido"}).encode("utf-8")
+        _set_headers(handler, 400, error_response)
+        handler.wfile.write(error_response)
+        return
+
+    user_id = get_user_id_from_session(handler)
+    if not user_id:
+        error_response = json.dumps({"errore": "Autenticazione richiesta"}).encode("utf-8")
+        _set_headers(handler, 401, error_response)
+        handler.wfile.write(error_response)
+        return
+
+    with get_connection() as conn:
+        c = conn.cursor()
+        c.execute("""
+            SELECT user_id
+            FROM bookings
+            WHERE id = ?
+        """, (booking_id,))
+        booking = c.fetchone()
+
+        if not booking:
             error_response = json.dumps({"errore": "Prenotazione non trovata"}).encode("utf-8")
             _set_headers(handler, 404, error_response)
             handler.wfile.write(error_response)
             return
 
-        existing_id, existing_user_id, existing_service_id, existing_date, existing_status = row
-
-        # Se un campo non è presente nel JSON, manteniamo il valore esistente
-        updated_user_id = user_id if user_id is not None else existing_user_id
-        updated_service_id = service_id if service_id is not None else existing_service_id
-        updated_date = date if date is not None else existing_date
-        updated_status = status if status is not None else existing_status
-
-        # Opzionale: si possono aggiungere controlli per updated_user_id e updated_service_id,
-        # ad esempio verificare se esistono utenti/servizi corrispondenti nel DB
-
-        # Eseguiamo l'UPDATE nel database
-        c.execute("""
-            UPDATE bookings
-            SET user_id = ?,
-                service_id = ?,
-                date = ?,
-                status = ?
-            WHERE id = ?
-        """, (updated_user_id, updated_service_id, updated_date, updated_status, booking_id))
-        conn.commit()
-
-    # Creiamo l'oggetto di risposta con i campi aggiornati
-    updated_booking = {
-        "id": booking_id,
-        "user_id": updated_user_id,
-        "service_id": updated_service_id,
-        "date": updated_date,
-        "status": updated_status
-    }
-
-    # Convertiamo in JSON e inviamo la risposta con status 200
-    response_data = json.dumps(updated_booking).encode("utf-8")
-    _set_headers(handler, 200, response_data)
-    handler.wfile.write(response_data)
-
-def handle_delete_booking(handler, booking_id):
-    """DELETE /bookings/<id> - Elimina la prenotazione dal DB."""
-    try:
-        booking_id = int(booking_id)
-    except ValueError:
-        error_response = json.dumps({"error": "Invalid ID"}).encode("utf-8")
-        _set_headers(handler, 400, error_response)
-        handler.wfile.write(error_response)
-        return
-
-    with get_connection() as conn:
-        c = conn.cursor()
-        # Controlliamo se la prenotazione esiste
-        c.execute("SELECT id FROM bookings WHERE id = ?", (booking_id,))
-        row = c.fetchone()
-        if not row:
-            error_response = json.dumps({"error": "Booking not found"}).encode("utf-8")
-            _set_headers(handler, 404, error_response)
+        if booking["user_id"] != user_id:
+            error_response = json.dumps({"errore": "Accesso negato alla prenotazione"}).encode("utf-8")
+            _set_headers(handler, 403, error_response)
             handler.wfile.write(error_response)
             return
 
         c.execute("DELETE FROM bookings WHERE id = ?", (booking_id,))
         conn.commit()
 
-    response_data = json.dumps({"message": f"Booking {booking_id} deleted"}).encode("utf-8")
-    _set_headers(handler, 200, response_data)
-    handler.wfile.write(response_data)
+    success_response = {"messaggio": f"Prenotazione {booking_id} eliminata con successo"}
+    _set_headers(handler, 200, json.dumps(success_response).encode("utf-8"))
+    handler.wfile.write(json.dumps(success_response).encode("utf-8"))
