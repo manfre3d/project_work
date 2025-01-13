@@ -29,16 +29,19 @@ def init_db():
         
         # Creazione tabella bookings
         c.execute("""
-        CREATE TABLE IF NOT EXISTS bookings (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            service_id INTEGER NOT NULL,
-            date TEXT NOT NULL,
-            status TEXT NOT NULL DEFAULT 'pending',
-            FOREIGN KEY (user_id) REFERENCES users(id),
-            FOREIGN KEY (service_id) REFERENCES services(id)
-        );
+            CREATE TABLE IF NOT EXISTS bookings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                service_id INTEGER NOT NULL,
+                start_date TEXT NOT NULL,
+                end_date TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                capacity_requested INTEGER NOT NULL DEFAULT 1,
+                FOREIGN KEY (user_id) REFERENCES users(id),
+                FOREIGN KEY (service_id) REFERENCES services(id)
+            );
         """)
+
 
         # Creazione tabella users
         c.execute("""
