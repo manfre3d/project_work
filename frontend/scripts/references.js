@@ -12,7 +12,8 @@ export const sectionNewBooking = document.getElementById("section-new-booking");
 // Altre variabili
 export const loginForm = document.getElementById("login-form");
 export const formNewBooking = document.getElementById("form-new-booking");
-export const bookingListDiv = document.getElementById("booking-list");
+// export const bookingListDiv = document.getElementById("booking-list");
+export const bookingList = document.getElementById("booking-list");
 
 // Variabile globale (per ID utente loggato)
 export let currentUserId = null;
