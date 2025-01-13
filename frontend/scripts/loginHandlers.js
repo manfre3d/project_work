@@ -17,7 +17,7 @@ export function setupLoginHandler() {
           "Content-Type": "application/json",
         },
         // invia automaticamente il cookie di sessione gestito nel backend al server
-        credentials: "include", 
+        credentials: "include",
         body: JSON.stringify({ username, password }),
       });
 
@@ -30,9 +30,9 @@ export function setupLoginHandler() {
 
       showModal("Login effettuato", `Bentornato, ${userData.username}!`);
       // mostra il pulsante logout
-      btnLogout.style.display = "inline-block"; 
+      btnLogout.style.display = "inline-block";
       // naviga alla sezione prenotazioni
-      showSection(sectionBookings); 
+      showSection(sectionBookings);
     } catch (error) {
       console.error("Errore durante il login:", error);
       showModal("Errore", `Login fallito: ${error.message}`);
@@ -40,26 +40,35 @@ export function setupLoginHandler() {
   });
 }
 export function setupLogoutHandler() {
-  const btnLogout = document.getElementById("btnLogout");
+  console.log("btnLogout:", btnLogout); // log per verificare il riferimento
+  if (!btnLogout) {
+    console.error("Errore: btnLogout non trovato nel DOM.");
+    return;
+  }
+
   btnLogout.addEventListener("click", async () => {
-      try {
-          const response = await fetch("http://localhost:8000/logout", {
-              method: "POST",
-              credentials: "include", 
-          });
+    try {
+      const response = await fetch("http://localhost:8000/logout", {
+        method: "POST",
+        credentials: "include",
+      });
 
-          if (!response.ok) {
-              const errMsg = await response.json();
-              throw new Error(errMsg.error || "Errore durante il logout");
-          }
-
-          showModal("Logout effettuato", "Sei stato disconnesso con successo.");
-          btnLogout.style.display = "none"; 
-          // naviga alla sezione login dopo il logout
-          showSection(sectionLogin);
-      } catch (error) {
-          console.error("Errore durante il logout:", error);
-          showModal("Errore", `Logout fallito: ${error.message}`);
+      if (!response.ok) {
+        const errMsg = await response.json();
+        throw new Error(errMsg.error || "Errore durante il logout");
       }
+
+      // mostra un messaggio di conferma logout
+      showModal("Logout effettuato", "Sei stato disconnesso con successo.");
+
+      // nascondi il pulsante logout
+      btnLogout.style.display = "none";
+
+      // mostra la sezione di login
+      showSection(sectionLogin);
+    } catch (error) {
+      console.error("Errore durante il logout:", error);
+      showModal("Errore", `Logout fallito: ${error.message}`);
+    }
   });
 }

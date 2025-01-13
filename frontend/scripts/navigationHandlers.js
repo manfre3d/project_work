@@ -9,7 +9,6 @@ import {
   currentUserId,
   setCurrentUserId,
 } from "./references.js";
-import { setupLogoutHandler } from "./loginHandlers.js";
 import { loadAllBookings } from "./bookingHandlers.js";
 import { showModal } from "./utility.js";
 
@@ -44,7 +43,6 @@ function handleBtnNewBookingClick() {
 // funzione che collega i pulsanti della navigazione ai relativi gestori/handler
 export function setupNavHandlers() {
   btnLogin.addEventListener("click", handleBtnLoginClick);
-  btnLogout.addEventListener("click", setupLogoutHandler);
   btnBookings.addEventListener("click", handleBtnBookingsClick);
   btnNewBooking.addEventListener("click", handleBtnNewBookingClick);
 }

@@ -2,24 +2,24 @@ import { setupNavHandlers, showSection } from "./navigationHandlers.js";
 import { setupLoginHandler } from "./loginHandlers.js";
 import { setupBookingHandler } from "./bookingHandlers.js";
 import { sectionLogin } from "./references.js";
+import { setupLogoutHandler } from "./loginHandlers.js";
 
 function init() {
-
-  // collego i pulsanti della navigazione ai relativi gestori/handler
+  // collega i pulsanti della navigazione ai gestori
   setupNavHandlers();
 
-  // handler per il form di login
+  // configura il gestore del form di login
   setupLoginHandler();
 
-  //handler per il pulsante di logout
+  // configura il gestore del pulsante di logout
   setupLogoutHandler();
-  
-  // handler per il form di prenotazione
+
+  // configura il gestore del form di prenotazione
   setupBookingHandler();
 
-  // mostro la sezione di login all'avvio
+  // mostra la sezione login all'avvio
   showSection(sectionLogin);
 }
 
-// inizializzazione
-init();
+// attende che il DOM sia completamente caricato
+document.addEventListener("DOMContentLoaded", init);
