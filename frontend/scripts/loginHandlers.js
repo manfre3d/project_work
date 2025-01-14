@@ -3,6 +3,8 @@ import { showModal } from "./utility.js";
 import { showSection } from "./navigationHandlers.js";
 import { sectionBookings } from "./references.js";
 import { loadAllBookings } from "./bookingHandlers.js";
+import { setCurrentUserId } from "./references.js";
+
 
 export function setupLoginHandler() {
   loginForm.addEventListener("submit", async (e) => {
@@ -28,6 +30,9 @@ export function setupLoginHandler() {
       }
 
       const userData = await response.json();
+
+      // Imposta l'utente corrente
+      setCurrentUserId(userData.id);
 
       showModal("Login effettuato", `Bentornato, ${userData.username}!`);
       // mostra il pulsante logout
