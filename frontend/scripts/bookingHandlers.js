@@ -68,12 +68,47 @@ function attachEventHandlers() {
   );
 }
 
+async function loadServices() {
+  try {
+    const response = await fetch("http://localhost:8000/services", {
+      method: "GET",
+      credentials: "include",
+    });
+
+    if (!response.ok) {
+      const errMsg = await response.json();
+      throw new Error(errMsg.error || "Errore nel caricamento dei servizi");
+    }
+
+    const services = await response.json();
+    const editServiceSelect = document.getElementById("editService");
+
+    // Svuota le opzioni esistenti
+    editServiceSelect.innerHTML = "";
+
+    // Aggiungi le opzioni dei servizi
+    services.forEach((service) => {
+      const option = document.createElement("option");
+      option.value = service.id;
+      option.textContent = service.name;
+      editServiceSelect.appendChild(option);
+    });
+  } catch (error) {
+    console.error("Errore nel caricamento dei servizi:", error);
+    showModal("Errore", `Impossibile caricare i servizi: ${error.message}`);
+  }
+}
+
+
 /**
  * mostra la modale per modificare una prenotazione.
  * @param {Event} event - evento click sul pulsante di modifica.
  */
 async function handleEditBooking(event) {
   selectedBookingId = event.target.dataset.id;
+
+  // richiama i servizi disponibili, per visualizzarli nella modale di modifica
+  await loadServices();
 
   try {
     const response = await fetch(`http://localhost:8000/bookings/${selectedBookingId}`, {
@@ -189,13 +224,47 @@ async function confirmDeleteBooking() {
 }
 
 /**
- * configura il gestore per la creazione di una nuova prenotazione.
+ * Recupera i servizi dal server e popola il menu a discesa
+ */
+async function populateServicesDropdown() {
+  try {
+    const response = await fetch("http://localhost:8000/services", {
+      method: "GET",
+      credentials: "include",
+    });
+
+    if (!response.ok) {
+      const errMsg = await response.json();
+      throw new Error(errMsg.error || "Errore nel caricamento dei servizi");
+    }
+
+    const services = await response.json();
+    const serviceSelect = document.getElementById("service");
+    serviceSelect.innerHTML = ""; // Svuota le opzioni esistenti
+
+    services.forEach((service) => {
+      const option = document.createElement("option");
+      option.value = service.id;
+      option.textContent = `${service.name} - ${service.description}`;
+      serviceSelect.appendChild(option);
+    });
+  } catch (error) {
+    console.error("Errore nel caricamento dei servizi:", error);
+    showModal("Errore", `Impossibile caricare i servizi: ${error.message}`);
+  }
+}
+
+/**
+ * Configura il gestore per la creazione di una nuova prenotazione.
  */
 export function setupBookingHandler() {
+  // Popola i servizi disponibili
+  populateServicesDropdown();
+
   formNewBooking.addEventListener("submit", async (e) => {
     e.preventDefault();
 
-    const service_id = document.getElementById("service").value.trim();
+    const service_id = document.getElementById("service").value;
     const start_date = document.getElementById("start_date").value;
     const end_date = document.getElementById("end_date").value;
 
@@ -222,9 +291,7 @@ export function setupBookingHandler() {
         `La tua prenotazione con ID=${created.id} è stata creata con successo.`
       );
 
-      formNewBooking.reset();
-      showSection(sectionBookings);
-      loadAllBookings();
+      formNewBooking.reset(); // Resetta il form
     } catch (error) {
       console.error("Errore nella creazione della prenotazione:", error);
       showModal("Errore", `Messaggio: ${error.message}`);

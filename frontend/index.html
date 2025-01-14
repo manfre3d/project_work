@@ -100,36 +100,38 @@
         <h2>Nuova Prenotazione</h2>
         <form id="form-new-booking">
           <div class="mb-3">
-            <label for="customer_name" class="form-label">Nome Cliente:</label>
-            <input
-              class="form-control"
-              id="customer_name"
-              name="customer_name"
-              type="text"
-              required
-            />
+            <label for="service" class="form-label">Servizio:</label>
+            <select class="form-select" id="service" name="service" required>
+              <!-- Opzioni popolate dinamicamente -->
+            </select>
           </div>
           <div class="mb-3">
-            <label for="date" class="form-label">Data (YYYY-MM-DD):</label>
+            <label for="start_date" class="form-label"
+              >Data Inizio (YYYY-MM-DD):</label
+            >
             <input
               class="form-control"
-              id="date"
-              name="date"
+              id="start_date"
+              name="start_date"
               type="date"
               required
             />
           </div>
           <div class="mb-3">
-            <label for="service" class="form-label">Film o Sala:</label>
+            <label for="end_date" class="form-label"
+              >Data Fine (YYYY-MM-DD):</label
+            >
             <input
               class="form-control"
-              id="service"
-              name="service"
-              type="text"
+              id="end_date"
+              name="end_date"
+              type="date"
               required
             />
           </div>
-          <button type="submit" class="btn btn-success">Prenota</button>
+          <button type="submit" class="btn btn-success">
+            Crea Prenotazione
+          </button>
         </form>
       </section>
     </main>
@@ -234,12 +236,9 @@
             <form id="editBookingForm">
               <div class="mb-3">
                 <label for="editService" class="form-label">Servizio:</label>
-                <input
-                  type="text"
-                  id="editService"
-                  class="form-control"
-                  required
-                />
+                <select id="editService" class="form-select" required>
+                  <!-- opzioni caricate dinamicamente -->
+                </select>
               </div>
               <div class="mb-3">
                 <label for="editStartDate" class="form-label"

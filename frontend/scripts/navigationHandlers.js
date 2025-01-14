@@ -6,8 +6,7 @@ import {
   sectionLogin,
   sectionBookings,
   sectionNewBooking,
-  currentUserId,
-  setCurrentUserId,
+  currentUserId
 } from "./references.js";
 import { loadAllBookings } from "./bookingHandlers.js";
 import { showModal } from "./utility.js";
