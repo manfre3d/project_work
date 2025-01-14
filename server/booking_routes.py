@@ -3,7 +3,9 @@ import sqlite3
 from db import get_connection
 from utility.session import get_session_id, get_user_id_from_session
 from utility.utility import (
-    _set_headers
+    _set_headers,
+    extrapolate_user_id_from_session,
+    verify_session
 )
 from datetime import datetime
 
@@ -85,6 +87,9 @@ def handle_create_booking(handler):
     content_length = int(handler.headers.get("Content-Length", 0))
     body = handler.rfile.read(content_length).decode("utf-8")
 
+    verify_session(handler)
+    
+    
     try:
         data = json.loads(body)
     except json.JSONDecodeError:
@@ -97,7 +102,7 @@ def handle_create_booking(handler):
         _send_error(handler, 400, validation_result["error"])
         return
 
-    user_id = data["user_id"]
+    user_id = data["user_id"] if data.get("user_id") else extrapolate_user_id_from_session(handler)
     service_id = data["service_id"]
     start_date = validation_result["start_date"]
     end_date = validation_result["end_date"]
@@ -135,8 +140,11 @@ def handle_create_booking(handler):
     handler.wfile.write(response_data)
     
 def _validate_booking_data(data):
-    """Valida i dati della prenotazione e converte le date."""
-    required_fields = ["user_id", "service_id", "start_date", "end_date"]
+    """valida i dati della prenotazione e converte le date. Non effettua controlli, 
+    sull'user_id perché può essere fornito o estratto dalla sessione."""
+    required_fields = ["service_id", "start_date", "end_date"]
+
+    # verifica che tutti i campi richiesti ("service_id", "start_date", "end_date") siano presenti
     for field in required_fields:
         if not data.get(field):
             return {"error": f"Campo obbligatorio mancante: {field}"}
@@ -201,21 +209,7 @@ def handle_update_booking(handler, booking_id):
     """
     PUT /bookings/<id> - Aggiorna la prenotazione esistente.
     """
-    # ottieni il session_id
-    session_id = get_session_id(handler)
-    if not session_id:
-        error_response = json.dumps({"error": "Sessione non valida o non fornita"}).encode("utf-8")
-        _set_headers(handler, 401, error_response)
-        handler.wfile.write(error_response)
-        return
-
-    # verifica l'utente associato alla sessione
-    user_id = get_user_id_from_session(session_id)
-    if not user_id:
-        error_response = json.dumps({"error": "Sessione scaduta o non valida"}).encode("utf-8")
-        _set_headers(handler, 401, error_response)
-        handler.wfile.write(error_response)
-        return
+    verify_session(handler)
 
     # logica per aggiornare la prenotazione
     try:
@@ -236,6 +230,8 @@ def handle_update_booking(handler, booking_id):
         _set_headers(handler, 400, error_response)
         handler.wfile.write(error_response)
         return
+
+    user_id = data.get("user_id") if data.get("user_id") else extrapolate_user_id_from_session(handler)
 
     service_id = data.get("service_id")
     start_date = data.get("start_date")
