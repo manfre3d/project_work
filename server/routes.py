@@ -1,5 +1,4 @@
 import json
-import re
 from booking_routes import (
     handle_get_all_bookings,
     handle_get_booking_by_id,
@@ -7,7 +6,6 @@ from booking_routes import (
     handle_update_booking,
     handle_delete_booking
 )
-from availability_routes import handle_get_availability
 from utility.utility import _set_headers, parse_path, parse_query
 from user_routes import (
     handle_login,
@@ -29,7 +27,7 @@ from authentication import verify_authentication
 
 def route_request(handler, method):
     # rotte publiche che non richiedono autenticazione
-    public_routes = [("login", "POST"), ("logout", "POST")]
+    public_routes = [("login", "POST"), ("logout", "POST"),("users","POST")]
 
     # logica per analizzare il percorso della richiesta
     print(f"Routing request: path={handler.path}, method={method}")

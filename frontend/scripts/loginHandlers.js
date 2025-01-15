@@ -1,11 +1,15 @@
-import { loginForm, btnLogout } from "./references.js";
 import { showModal } from "./utility.js";
 import { showSection } from "./navigationHandlers.js";
-import { sectionBookings } from "./references.js";
-import { sectionLogin } from "./references.js";
+import {
+  loginForm,
+  btnLogout,
+  sectionBookings,
+  sectionLogin,
+  setCurrentUserId,
+  btnConfirmRegister,
+  btnRegister,
+} from "./references.js";
 import { loadAllBookings } from "./bookingHandlers.js";
-import { setCurrentUserId } from "./references.js";
-
 
 export function setupLoginHandler() {
   loginForm.addEventListener("submit", async (e) => {
@@ -20,7 +24,7 @@ export function setupLoginHandler() {
         headers: {
           "Content-Type": "application/json",
         },
-        // invia automaticamente il cookie di sessione gestito nel backend al server
+        // proprieta' necessaria per inviare i cookie al server
         credentials: "include",
         body: JSON.stringify({ username, password }),
       });
@@ -38,6 +42,7 @@ export function setupLoginHandler() {
       showModal("Login effettuato", `Bentornato, ${userData.username}!`);
       // mostra il pulsante logout
       btnLogout.style.display = "inline-block";
+      btnRegister.style.display = "none";
       // naviga alla sezione prenotazioni
       await loadAllBookings();
       showSection(sectionBookings);
@@ -71,12 +76,62 @@ export function setupLogoutHandler() {
 
       // nascondi il pulsante logout
       btnLogout.style.display = "none";
+      btnRegister.style.display = "inline-block";
 
       // mostra la sezione di login
       showSection(sectionLogin);
     } catch (error) {
       console.error("Errore durante il logout:", error);
       showModal("Errore", `Logout fallito: ${error.message}`);
+    }
+  });
+}
+
+export function setupRegisterHandler() {
+  //form di registrazione
+
+  btnConfirmRegister.addEventListener("click", async () => {
+
+    const form = document.getElementById("register-form");
+    if (!form.checkValidity()) {
+      form.reportValidity();
+      return;
+    }
+    const username = document.getElementById("registerUsername").value.trim();
+    const email = document.getElementById("registerEmail").value.trim();
+    const password = document.getElementById("registerPassword").value.trim();
+
+    if (!username || !email || !password) {
+      showModal("Errore", "Tutti i campi sono obbligatori!");
+      return;
+    }
+
+    try {
+      const response = await fetch("http://localhost:8000/users", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ username, email, password }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Errore durante la registrazione");
+      }
+
+      showModal(
+        "Registrazione completata",
+        "Registrazione avvenuta con successo! Ora puoi accedere."
+      );
+      document.getElementById("register-form").reset();
+      const registerModal = bootstrap.Modal.getInstance(
+        document.getElementById("registerModal")
+      );
+      registerModal.hide();
+    } catch (error) {
+      console.error("Errore durante la registrazione:", error);
+      showModal("Errore", `Registrazione fallita: ${error.message}`);
     }
   });
 }

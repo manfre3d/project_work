@@ -3,7 +3,8 @@ export const btnLogin = document.getElementById("btn-login");
 export const btnLogout = document.getElementById("btn-logout");
 export const btnBookings = document.getElementById("btn-bookings");
 export const btnNewBooking = document.getElementById("btn-new-booking");
-
+export const btnConfirmRegister = document.getElementById("confirmRegisterBtn")
+export const btnRegister = document.getElementById("btn-register")
 // Riferimenti alle sezioni
 export const sectionLogin = document.getElementById("section-login");
 export const sectionBookings = document.getElementById("section-bookings");

@@ -38,6 +38,17 @@
             <li class="nav-item">
               <button
                 class="nav-link btn"
+                id="btn-register"
+                data-bs-toggle="modal"
+                data-bs-target="#registerModal"
+              >
+                Registrati
+              </button>
+            </li>
+
+            <li class="nav-item">
+              <button
+                class="nav-link btn"
                 id="btn-logout"
                 style="display: none"
               >
@@ -85,6 +96,19 @@
               required
             />
           </div>
+          <!-- sezione registrazione -->
+          <p>
+            Non hai un account?
+            <a
+              
+              class="link-secondary link-offset-2 link-underline-opacity-25 link-underline-opacity-100-hover"
+              data-bs-toggle="modal"
+              data-bs-target="#registerModal"
+              aria-label="Registrati"
+            >
+              Registrati
+            </a>
+          </p>
           <button type="submit" class="btn btn-primary">Accedi</button>
         </form>
       </section>
@@ -135,43 +159,82 @@
         </form>
       </section>
     </main>
-    <!-- modale -->
+
+    <!-- modal di registrazione -->
     <div
       class="modal fade"
-      id="myModal"
+      id="registerModal"
       tabindex="-1"
-      aria-labelledby="modalTitle"
+      aria-labelledby="registerModalLabel"
       aria-hidden="true"
     >
       <div class="modal-dialog">
         <div class="modal-content">
-          <!-- Header -->
           <div class="modal-header">
-            <h5 class="modal-title" id="modalTitle">Titolo modale</h5>
+            <h5 class="modal-title" id="registerModalLabel">Registrati</h5>
             <button
               type="button"
               class="btn-close"
               data-bs-dismiss="modal"
-              aria-label="Close"
+              aria-label="Chiudi"
             ></button>
           </div>
-          <!-- Corpo -->
-          <div class="modal-body" id="modalBody">
-            <!-- Contenuto dinamico inserito da JS -->
+          <div class="modal-body">
+            <form id="register-form">
+              <div class="mb-3">
+                <label for="registerUsername" class="form-label"
+                  >Username:</label
+                >
+                <input
+                  type="text"
+                  id="registerUsername"
+                  class="form-control"
+                  required
+                />
+              </div>
+              <div class="mb-3">
+                <label for="registerEmail" class="form-label">Email:</label>
+                <input
+                  type="email"
+                  id="registerEmail"
+                  class="form-control"
+                  required
+                  placeholder="nome@email.com"
+                />
+              </div>
+              <div class="mb-3">
+                <label for="registerPassword" class="form-label"
+                  >Password:</label
+                >
+                <input
+                  type="password"
+                  id="registerPassword"
+                  class="form-control"
+                  required
+                />
+              </div>
+            </form>
           </div>
-          <!-- Footer (opzionale) -->
           <div class="modal-footer">
             <button
               type="button"
               class="btn btn-secondary"
               data-bs-dismiss="modal"
             >
-              Chiudi
+              Annulla
+            </button>
+            <button
+              type="submit"
+              id="confirmRegisterBtn"
+              class="btn btn-primary"
+            >
+              Registrati
             </button>
           </div>
         </div>
       </div>
     </div>
+
     <!-- Modale di conferma eliminazione -->
     <div
       class="modal fade"
@@ -211,7 +274,7 @@
         </div>
       </div>
     </div>
-
+    <!-- modale di editing prenotazione -->
     <div
       class="modal fade"
       id="editBookingModal"
@@ -277,7 +340,43 @@
         </div>
       </div>
     </div>
-
+    <!-- modale -->
+    <div
+      class="modal fade"
+      id="myModal"
+      tabindex="-1"
+      aria-labelledby="modalTitle"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <!-- Header -->
+          <div class="modal-header">
+            <h5 class="modal-title" id="modalTitle">Titolo modale</h5>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+            ></button>
+          </div>
+          <!-- Corpo -->
+          <div class="modal-body" id="modalBody">
+            <!-- Contenuto dinamico inserito da JS -->
+          </div>
+          <!-- Footer (opzionale) -->
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              data-bs-dismiss="modal"
+            >
+              Chiudi
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
     <!-- JavaScript: il tuo main.js come modulo -->
     <script src="scripts/main.js" type="module"></script>
 

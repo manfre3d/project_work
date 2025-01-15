@@ -1,8 +1,14 @@
-import { setupNavHandlers, showSection } from "./navigationHandlers.js";
-import { setupLoginHandler } from "./loginHandlers.js";
+import { 
+  setupNavHandlers, 
+  showSection
+ } from "./navigationHandlers.js";
+import { 
+  setupLoginHandler,
+  setupRegisterHandler,
+  setupLogoutHandler
+ } from "./loginHandlers.js";
 import { setupBookingHandler } from "./bookingHandlers.js";
 import { sectionLogin } from "./references.js";
-import { setupLogoutHandler } from "./loginHandlers.js";
 
 function init() {
   // collega i pulsanti della navigazione ai gestori
@@ -13,6 +19,9 @@ function init() {
 
   // configura il gestore del pulsante di logout
   setupLogoutHandler();
+
+  // configura il gestore del pulsante di registrazione
+  setupRegisterHandler();  
 
   // configura il gestore del form di prenotazione
   setupBookingHandler();
