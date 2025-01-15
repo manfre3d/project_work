@@ -9,6 +9,7 @@ import {
   currentUserId
 } from "./references.js";
 import { loadAllBookings } from "./bookingHandlers.js";
+import { populateServicesDropdown } from "./bookingHandlers.js";
 import { showModal } from "./utility.js";
 
 export function showSection(section) {
@@ -36,6 +37,8 @@ function handleBtnNewBookingClick() {
     showSection(sectionLogin);
     return;
   }
+  // Popola i servizi disponibili
+  populateServicesDropdown();
   showSection(sectionNewBooking);
 }
 

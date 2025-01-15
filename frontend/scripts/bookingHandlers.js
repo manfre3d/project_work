@@ -226,7 +226,7 @@ async function confirmDeleteBooking() {
 /**
  * Recupera i servizi dal server e popola il menu a discesa
  */
-async function populateServicesDropdown() {
+export async function populateServicesDropdown() {
   try {
     const response = await fetch("http://localhost:8000/services", {
       method: "GET",
@@ -262,8 +262,6 @@ export function setupBookingHandler() {
   formNewBooking.addEventListener("submit", async (e) => {
     // Evita il comportamento predefinito del form (ricaricamento della pagina) 
     e.preventDefault();
-    // Popola i servizi disponibili
-    populateServicesDropdown();
 
     const service_id = document.getElementById("service").value;
     const start_date = document.getElementById("start_date").value;

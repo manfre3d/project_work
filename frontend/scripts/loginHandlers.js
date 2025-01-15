@@ -2,6 +2,7 @@ import { loginForm, btnLogout } from "./references.js";
 import { showModal } from "./utility.js";
 import { showSection } from "./navigationHandlers.js";
 import { sectionBookings } from "./references.js";
+import { sectionLogin } from "./references.js";
 import { loadAllBookings } from "./bookingHandlers.js";
 import { setCurrentUserId } from "./references.js";
 
