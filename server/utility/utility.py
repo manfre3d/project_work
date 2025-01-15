@@ -1,6 +1,5 @@
 import json
 from urllib.parse import urlparse, parse_qs
-
 from utility.session import get_session_id, get_user_id_from_session
 
 def _set_headers(handler, code=200, response_data=b'', content_type="application/json", extra_headers=None, origin="http://localhost:8000"):
