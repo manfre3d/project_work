@@ -198,6 +198,20 @@ def handle_create_user(handler):
     # password dell'utente prima del hashing
     password = data.get("password", "")
     email = data.get("email", "")
+    
+    # validazione campi
+    if not username or not password or not email:
+        error_response = json.dumps({"error": "Tutti i campi sono obbligatori"}).encode("utf-8")
+        _set_headers(handler, 400, error_response)
+        handler.wfile.write(error_response)
+        return
+
+    # validazione formato della email
+    if "@" not in email or "." not in email or email.index("@") > email.rindex("."):
+        error_response = json.dumps({"error": "Email non valida"}).encode("utf-8")
+        _set_headers(handler, 400, error_response)
+        handler.wfile.write(error_response)
+        return
 
     # hashing della  password tramite l'utililizzo di bcrypt
     hashed_pw = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
