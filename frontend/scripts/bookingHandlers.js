@@ -258,11 +258,12 @@ async function populateServicesDropdown() {
  * Configura il gestore per la creazione di una nuova prenotazione.
  */
 export function setupBookingHandler() {
-  // Popola i servizi disponibili
-  populateServicesDropdown();
-
+  
   formNewBooking.addEventListener("submit", async (e) => {
+    // Evita il comportamento predefinito del form (ricaricamento della pagina) 
     e.preventDefault();
+    // Popola i servizi disponibili
+    populateServicesDropdown();
 
     const service_id = document.getElementById("service").value;
     const start_date = document.getElementById("start_date").value;
