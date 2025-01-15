@@ -7,6 +7,7 @@ from booking_routes import (
     handle_update_booking,
     handle_delete_booking
 )
+from availability_routes import handle_get_availability
 from utility.utility import _set_headers, parse_path, parse_query
 from user_routes import (
     handle_login,
@@ -24,14 +25,25 @@ from service_routes import (
     handle_update_service,
     handle_delete_service
 )
+from authentication import verify_authentication
 
 def route_request(handler, method):
-    # logica per analizzare il percorso
+    # rotte publiche che non richiedono autenticazione
+    public_routes = [("login", "POST"), ("logout", "POST")]
+
+    # logica per analizzare il percorso della richiesta
     print(f"Routing request: path={handler.path}, method={method}")
     resource, resource_id = parse_path(handler.path)
     query_params = parse_query(handler.path)
     print(f"Parsed path: resource={resource}, resource_id={resource_id}, query={query_params}")
 
+    # Log aggiuntivo per verificare autenticazione
+    if (resource, method) not in public_routes:
+        authenticated_user = verify_authentication(handler)
+        if not authenticated_user:
+            print("Autenticazione fallita!")
+            return
+        print(f"Utente autenticato: {authenticated_user}")
     # rotta per i servizi
     if resource == "services":
         if resource_id is None:

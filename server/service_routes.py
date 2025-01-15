@@ -1,25 +1,14 @@
 import json
 from db import get_connection
+from authentication import verify_authentication
 from utility.utility import _set_headers
-from utility.session import get_user_id_from_session, clean_expired_sessions
-from utility.session import get_user_id_from_session
-from utility.session import get_user_id_from_session
+from user_routes import authenticate
 
-def authenticate(handler):
-    """Funzione di autenticazione comune."""
-    from user_routes import authenticate as user_authenticate
-    return user_authenticate(handler)
 
 def handle_get_all_services(handler):
     """
     GET /services - Ritorna tutti i servizi dal DB.
     """
-    authenticated_user = authenticate(handler)
-    if not authenticated_user:
-        error_response = json.dumps({"error": "Autenticazione richiesta"}).encode("utf-8")
-        _set_headers(handler, 401, error_response)
-        handler.wfile.write(error_response)
-        return
 
     with get_connection() as conn:
         c = conn.cursor()
