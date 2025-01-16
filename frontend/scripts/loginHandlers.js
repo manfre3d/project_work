@@ -22,7 +22,7 @@ export function setupLoginHandler() {
     const password = document.getElementById("password").value.trim();
 
     try {
-      const response = await fetch("http://localhost:8000/login", {
+      const response = await fetch("login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -71,7 +71,7 @@ export function setupLogoutHandler() {
 
   btnLogout.addEventListener("click", async () => {
     try {
-      const response = await fetch("http://localhost:8000/logout", {
+      const response = await fetch("logout", {
         method: "POST",
         credentials: "include",
       });
@@ -120,7 +120,7 @@ export function setupRegisterHandler() {
     }
 
     try {
-      const response = await fetch("http://localhost:8000/users", {
+      const response = await fetch("users", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

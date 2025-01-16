@@ -53,7 +53,7 @@ function attachEventHandlers() {
 
 async function loadServices() {
   try {
-    const response = await fetch("http://localhost:8000/services", {
+    const response = await fetch("services", {
       method: "GET",
       credentials: "include",
     });
@@ -106,7 +106,7 @@ async function handleEditBooking(event) {
 
   try {
     const response = await fetch(
-      `http://localhost:8000/bookings/${selectedBookingId}`,
+      `bookings/${selectedBookingId}`,
       {
         method: "GET",
         credentials: "include",
@@ -219,7 +219,7 @@ async function confirmEditBooking() {
 
   try {
     const response = await fetch(
-      `http://localhost:8000/bookings/${selectedBookingId}`,
+      `bookings/${selectedBookingId}`,
       {
         method: "PUT",
         headers: {
@@ -284,7 +284,7 @@ async function confirmDeleteBooking() {
 
   try {
     const response = await fetch(
-      `http://localhost:8000/bookings/${selectedBookingId}`,
+      `bookings/${selectedBookingId}`,
       {
         method: "DELETE",
         credentials: "include",
@@ -343,7 +343,7 @@ async function confirmDeleteBooking() {
 // todo capire se ci sono ripetizione
 export async function populateServicesDropdown() {
   try {
-    const response = await fetch("http://localhost:8000/services", {
+    const response = await fetch("services", {
       method: "GET",
       credentials: "include",
     });
@@ -406,7 +406,7 @@ export function setupBookingHandler() {
     const newBooking = { service_id, start_date, end_date, total_price };
 
     try {
-      const response = await fetch("http://localhost:8000/bookings", {
+      const response = await fetch("bookings", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -437,7 +437,7 @@ export function setupBookingHandler() {
 
 export async function loadAllBookings() {
   try {
-    const response = await fetch("http://localhost:8000/bookings", {
+    const response = await fetch("bookings", {
       method: "GET",
       credentials: "include",
     });
@@ -473,7 +473,7 @@ export async function loadAllBookings() {
 async function updateBookingStatus(bookingId, newStatus, userId) {
   try {
     const response = await fetch(
-      `http://localhost:8000/bookings/${bookingId}`,
+      `bookings/${bookingId}`,
       {
         method: "PUT",
         headers: {
@@ -565,7 +565,7 @@ async function handleAdminEditBooking(bookingId, userId) {
   selectedUserId = userId;
   try {
     const response = await fetch(
-      `http://localhost:8000/bookings/${bookingId}`,
+      `bookings/${bookingId}`,
       {
         method: "GET",
         credentials: "include",
@@ -606,7 +606,7 @@ async function saveAdminBooking() {
 
   try {
     const response = await fetch(
-      `http://localhost:8000/bookings/${bookingId}`,
+      `bookings/${bookingId}`,
       {
         method: "PUT",
         headers: {
