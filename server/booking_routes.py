@@ -392,6 +392,9 @@ def handle_update_booking(handler, booking_id):
 
 def handle_delete_booking(handler, booking_id):
     """DELETE /bookings/<id> - Elimina una prenotazione."""
+    authenticated_user = authenticate(handler)
+    
+    role = authenticated_user["role"] 
     try:
         booking_id = int(booking_id)
     except ValueError:
@@ -432,7 +435,7 @@ def handle_delete_booking(handler, booking_id):
             handler.wfile.write(error_response)
             return
 
-        if booking["user_id"] != user_id:
+        if booking["user_id"] != user_id and role != "admin":
             error_response = json.dumps({"errore": "Accesso negato alla prenotazione"}).encode("utf-8")
             _set_headers(handler, 403, error_response)
             handler.wfile.write(error_response)
