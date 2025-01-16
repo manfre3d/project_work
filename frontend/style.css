@@ -255,3 +255,84 @@ form button.btn {
   background-color: #dc3545;
   color: #fff;
 }
+
+/* Pulsanti azione nella tabella Admin */
+.btn-admin-table-success {
+  width: 100%;
+  background-color: #28a745; 
+  color: white;
+  border: none;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  transition: background-color 0.2s, transform 0.1s ease;
+}
+
+.btn-admin-table-success:hover {
+  background-color: #218838; 
+  transform: scale(1.05);
+}
+
+.btn-admin-table-pending {
+  width: 100%;
+  background-color: #ffc107; 
+  color: black;
+  border: none;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  transition: background-color 0.2s, transform 0.1s ease;
+}
+
+.btn-admin-table-pending:hover {
+  background-color: #e0a800; 
+  transform: scale(1.05);
+}
+
+.btn-admin-table-edit {
+  width: 100%;
+  background-color: #007bff; 
+  color: white;
+  border: none;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  transition: background-color 0.2s, transform 0.1s ease;
+}
+
+.btn-admin-table-edit:hover {
+  background-color: #0056b3; 
+  transform: scale(1.05);
+}
+
+.btn-admin-table-cancel {
+  width: 100%;
+  background-color: #dc3545; 
+  color: white;
+  border: none;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  transition: background-color 0.2s, transform 0.1s ease;
+}
+
+.btn-admin-table-cancel:hover {
+  background-color: #a71d2a; 
+  transform: scale(1.05);
+}
+
+.btn-admin-table-delete {
+  width: 100%;
+  background-color: #6c757d; 
+  color: white;
+  border: none;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  transition: background-color 0.2s, transform 0.1s ease;
+}
+
+.btn-admin-table-delete:hover {
+  background-color: #5a6268; 
+  transform: scale(1.05);
+}
