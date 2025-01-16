@@ -510,42 +510,44 @@ function renderAdminBookingList(bookings) {
   bookings.forEach((booking) => {
     const row = document.createElement("tr");
     row.innerHTML = `
-      <td>${booking.id}</td>
-      <td>${booking.username || "N/A"}</td>
-      <td>${booking.service_name}</td>
-      <td>${booking.start_date}</td>
-      <td>${booking.end_date}</td>
-      <td>€${booking.total_price.toFixed(2)}</td> 
-      <td>${booking.status}</td>
-      <td>
-        <button 
-          class="btn btn-success btn-sm btn-admin-table-success" data-user-id="${
-          booking.user_id
-        }" data-id="${booking.id}" data-status="confirmed">
-          Conferma
-        </button>
-        <button 
-          class="btn btn-primary btn-sm btn-edit btn-admin-table-edit"
-          data-id="${booking.id}" data-user-id="${booking.user_id}"
-        >
-          Modifica
-        </button>
-        <button 
-          class="btn btn-danger btn-sm btn-delete btn-admin-table-cancel" data-user-id="${booking.user_id}"
-          data-id="${booking.id}"
-        >
-          Cancella
-        </button>
-        <button class="btn btn-warning btn-sm btn-admin-table-pending" data-user-id="${
-          booking.user_id
-        }" data-id="${booking.id}" data-status="pending"">
-          Rendi Pending
-        </button>
-        <button 
-          class="btn btn-danger btn-sm btn-delete btn-admin-table-delete" data-user-id="${booking.user_id}"
-          data-id="${booking.id}">
-            Elimina
-        </button>
+      <td data-label="ID">${booking.id}</td>
+      <td data-label="Utente">${booking.username || "N/A"}</td>
+      <td data-label="Servizio">${booking.service_name}</td>
+      <td data-label="Inizio">${booking.start_date}</td>
+      <td data-label="Fine">${booking.end_date}</td>
+      <td data-label="Prezzo Totale">€${booking.total_price.toFixed(2)}</td> 
+      <td data-label="Stato">${booking.status}</td>
+      <td data-label="Azioni">
+        <div class="card-actions">
+          <button 
+            class="btn btn-success btn-sm btn-admin-table-success" data-user-id="${
+            booking.user_id
+          }" data-id="${booking.id}" data-status="confirmed">
+            Conferma
+          </button>
+          <button 
+            class="btn btn-primary btn-sm btn-edit btn-admin-table-edit"
+            data-id="${booking.id}" data-user-id="${booking.user_id}"
+          >
+            Modifica
+          </button>
+          <button 
+            class="btn btn-danger btn-sm btn-delete btn-admin-table-cancel" data-user-id="${booking.user_id}"
+            data-id="${booking.id}"
+          >
+            Cancella
+          </button>
+          <button class="btn btn-warning btn-sm btn-admin-table-pending" data-user-id="${
+            booking.user_id
+          }" data-id="${booking.id}" data-status="pending"">
+            Rendi Pending
+          </button>
+          <button 
+            class="btn btn-danger btn-sm btn-delete btn-admin-table-delete" data-user-id="${booking.user_id}"
+            data-id="${booking.id}">
+              Elimina
+          </button>
+        </div>
       </td>
     `;
     adminTableBody.appendChild(row);

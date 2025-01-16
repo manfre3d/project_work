@@ -336,3 +336,73 @@ form button.btn {
   background-color: #5a6268; 
   transform: scale(1.05);
 }
+.table-responsive {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+}
+
+@media (max-width: 576px) {
+  table.table {
+    display: block;
+  }
+
+  table.table thead {
+    display: none; 
+  }
+
+  table.table tbody {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  table.table tbody tr {
+    display: block;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    padding: 1rem;
+    background: #fff;
+  }
+
+  table.table tbody tr td {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border: none;
+  }
+
+  table.table tbody tr td:before {
+    content: attr(data-label); 
+    font-weight: bold;
+    color: #333;
+    flex: 0 0 40%; 
+  }
+}
+
+.card-actions {
+  display: flex;
+  flex-wrap: wrap; 
+  gap: 0.5rem; 
+  justify-content: center;
+}
+
+
+.card-actions button {
+  flex: 1 1 auto; 
+  min-width: 100px; 
+  margin: 0; 
+}
+
+/* Media query per schermi piccoli */
+@media (max-width: 576px) {
+  .card-actions {
+    flex-direction: column; 
+  }
+
+  .card-actions button {
+    width: 100%;
+  }
+}
+

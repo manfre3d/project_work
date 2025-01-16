@@ -118,21 +118,23 @@
       <!-- Sezione per admin -->
       <section id="admin-bookings">
         <h2>Prenotazioni Admin</h2>
-        <table class="table table-striped">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Utente</th>
-              <th>Servizio</th>
-              <th>Inizio</th>
-              <th>Fine</th>
-              <th>Prezzo Totale</th>
-              <th>Stato</th>
-              <th>Azioni</th>
-            </tr>
-          </thead>
-          <tbody id="admin-bookings-tbody"></tbody>
-        </table>
+        <div class="table-responsive">
+          <table class="table table-striped">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Utente</th>
+                <th>Servizio</th>
+                <th>Inizio</th>
+                <th>Fine</th>
+                <th>Prezzo Totale</th>
+                <th>Stato</th>
+                <th>Azioni</th>
+              </tr>
+            </thead>
+            <tbody id="admin-bookings-tbody"></tbody>
+          </table>
+        </div>
       </section>
 
       <!-- Sezione NUOVA PRENOTAZIONE -->
@@ -141,8 +143,12 @@
         <form id="form-new-booking">
           <div class="mb-3">
             <label for="service" class="form-label">Servizio:</label>
-            <select class="form-select" id="service" name="service" required>
-            </select>
+            <select
+              class="form-select"
+              id="service"
+              name="service"
+              required
+            ></select>
           </div>
           <div class="mb-3">
             <label for="start_date" class="form-label"
@@ -211,8 +217,11 @@
                 <label for="editAdminService" class="form-label"
                   >Servizio:</label
                 >
-                <select id="editAdminService" class="form-select" required>
-                </select>
+                <select
+                  id="editAdminService"
+                  class="form-select"
+                  required
+                ></select>
               </div>
               <div class="mb-3">
                 <label for="editAdminStartDate" class="form-label"
@@ -235,7 +244,9 @@
                   class="form-control"
                   required
                 />
-                <p id="adminTotalPrice"><strong>Prezzo Totale:</strong> €0.00</p>
+                <p id="adminTotalPrice">
+                  <strong>Prezzo Totale:</strong> €0.00
+                </p>
               </div>
               <div class="mb-3">
                 <label for="editAdminStatus" class="form-label">Stato:</label>
@@ -374,7 +385,12 @@
             >
               Annulla
             </button>
-            <button type="button" id="confirmDeleteBtn" class="btn btn-danger"  data-context="">
+            <button
+              type="button"
+              id="confirmDeleteBtn"
+              class="btn btn-danger"
+              data-context=""
+            >
               Elimina
             </button>
           </div>
@@ -406,8 +422,7 @@
             <form id="editBookingForm">
               <div class="mb-3">
                 <label for="editService" class="form-label">Servizio:</label>
-                <select id="editService" class="form-select" required>
-                </select>
+                <select id="editService" class="form-select" required></select>
               </div>
               <div class="mb-3">
                 <label for="editStartDate" class="form-label"
@@ -467,8 +482,7 @@
               aria-label="Close"
             ></button>
           </div>
-          <div class="modal-body" id="modalBody">
-          </div>
+          <div class="modal-body" id="modalBody"></div>
           <div class="modal-footer">
             <button
               type="button"
