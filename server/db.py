@@ -37,6 +37,7 @@ def init_db():
                 end_date TEXT NOT NULL,
                 status TEXT NOT NULL DEFAULT 'pending',
                 capacity_requested INTEGER NOT NULL DEFAULT 1,
+                total_price REAL DEFAULT 0.0,
                 FOREIGN KEY (user_id) REFERENCES users(id),
                 FOREIGN KEY (service_id) REFERENCES services(id)
             );
@@ -65,18 +66,18 @@ def init_db():
             );
         """)
 
-        # Creare un amministratore di default se non esiste
+        # Crea un amministratore di default se non esiste
         c.execute("SELECT COUNT(*) as count FROM users WHERE role = 'admin'")
         admin_count = c.fetchone()["count"]
         if admin_count == 0:
             # Inserire un admin di default
             default_admin_username = "admin"
-            default_admin_password = bcrypt.hashpw("adminpassword".encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+            default_admin_password = bcrypt.hashpw("admin".encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
             default_admin_email = "admin@example.com"
             c.execute("""
                 INSERT INTO users (username, password, email, role)
                 VALUES (?, ?, ?, 'admin')
             """, (default_admin_username, default_admin_password, default_admin_email))
-            print("Amministratore di default creato: username='admin', password='adminpassword'")
+            print("Amministratore di default creato: username='admin', password='admin'")
         
         conn.commit()

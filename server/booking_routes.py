@@ -1,6 +1,7 @@
 import json
 import sqlite3
 from db import get_connection
+from authentication import authenticate
 from utility.session import get_session_id, get_user_id_from_session
 from utility.utility import (
     _set_headers,
@@ -8,32 +9,40 @@ from utility.utility import (
     verify_session
 )
 from datetime import datetime
-def authenticate(handler):
-    """Funzione di autenticazione comune."""
-    from user_routes import authenticate as user_authenticate
-    return user_authenticate(handler)
 
 def handle_get_all_bookings(handler):
-    """GET /bookings - Ritorna tutte le prenotazioni dal DB."""
-    
+    """
+    GET /bookings - Ritorna tutte le prenotazioni per admin o solo quelle
+    dell'utente corrente se non è un admin.
+    """
     authenticated_user = authenticate(handler)
-    
-    authenticate(handler)
-    if not authenticated_user:
-        error_response = json.dumps({"error": "Autenticazione richiesta"}).encode("utf-8")
-        _set_headers(handler, 401, error_response)
-        handler.wfile.write(error_response)
-        return
-    
+
+    user_id = authenticated_user["id"]
+    role = authenticated_user["role"]
+
     with get_connection() as conn:
         c = conn.cursor()
-        c.execute("""
-            SELECT b.id, b.user_id, b.service_id,
-                b.start_date, b.end_date, b.status,
-                s.name AS service_name, s.description
-            FROM bookings b
-            JOIN services s ON b.service_id = s.id
-        """)
+
+        if role == "admin":
+            # recupera tutte le prenotazioni presenti per tutti gli utenti se l'utente è un admin
+            c.execute("""
+                SELECT b.id, b.user_id, b.service_id, b.start_date, b.end_date, b.status, b.total_price,
+                       s.name AS service_name, s.description AS service_description,
+                       u.username AS user_name
+                FROM bookings b
+                JOIN services s ON b.service_id = s.id
+                JOIN users u ON b.user_id = u.id
+            """)
+        else:
+            # recupera solo le prenotazioni dell'utente corrente con ruolo user
+            c.execute("""
+                SELECT b.id, b.user_id, b.service_id, b.start_date, b.end_date, b.status, b.total_price,
+                       s.name AS service_name, s.description AS service_description
+                FROM bookings b
+                JOIN services s ON b.service_id = s.id
+                WHERE b.user_id = ?
+            """, (user_id,))
+
         rows = c.fetchall()
 
     results = []
@@ -41,19 +50,66 @@ def handle_get_all_bookings(handler):
         results.append({
             "id": row["id"],
             "user_id": row["user_id"],
+            "username": row["user_name"] if "user_name" in row.keys() else None,
             "service_id": row["service_id"],
+            "service_name": row["service_name"],
+            "service_description": row["service_description"],
             "start_date": row["start_date"],
             "end_date": row["end_date"],
             "status": row["status"],
-            "service_name": row["service_name"],
-            "service_description": row["description"],
+            "total_price": row["total_price"]
         })
 
     response_data = json.dumps(results).encode("utf-8")
     _set_headers(handler, 200, response_data)
     handler.wfile.write(response_data)
-
+    
 def handle_get_booking_by_id(handler, booking_id):
+    """GET /bookings/<id> - Ritorna la singola prenotazione, se esiste."""
+    try:
+        booking_id = int(booking_id)
+    except ValueError:
+        error_response = json.dumps({"error": "Invalid ID"}).encode("utf-8")
+        _set_headers(handler, 400, error_response)
+        handler.wfile.write(error_response)
+        return
+
+    with get_connection() as conn:
+        c = conn.cursor()
+        c.execute("""
+            SELECT 
+                b.id, b.user_id, b.service_id, 
+                b.start_date, b.end_date, b.status, b.total_price, 
+                s.name AS service_name,
+                u.username AS user_name
+            FROM bookings b
+            JOIN services s ON b.service_id = s.id
+            JOIN users u ON b.user_id = u.id
+            WHERE b.id = ?
+        """, (booking_id,))
+        row = c.fetchone()
+
+    if row:
+        result = {
+            "id": row["id"],
+            "user_id": row["user_id"],
+            "username": row["user_name"],  
+            "service_id": row["service_id"],
+            "start_date": row["start_date"],
+            "end_date": row["end_date"],
+            "status": row["status"],
+            "service_name": row["service_name"],
+            "total_price": row["total_price"]
+        }
+        response_data = json.dumps(result).encode("utf-8")
+        _set_headers(handler, 200, response_data)
+        handler.wfile.write(response_data)
+    else:
+        error_response = json.dumps({"error": "Booking not found"}).encode("utf-8")
+        _set_headers(handler, 404, error_response)
+        handler.wfile.write(error_response)
+
+
     """GET /bookings/<id> - Ritorna la singola prenotazione, se esiste."""
     try:
         booking_id = int(booking_id)
@@ -68,7 +124,7 @@ def handle_get_booking_by_id(handler, booking_id):
         c.execute("""
             SELECT 
                 b.id, b.user_id, b.service_id, 
-                b.start_date, b.end_date, b.status, 
+                b.start_date, b.end_date, b.status, b.total_price,
                 s.name AS service_name
             FROM bookings b
             JOIN services s ON b.service_id = s.id
@@ -85,6 +141,7 @@ def handle_get_booking_by_id(handler, booking_id):
             "end_date": row["end_date"],
             "status": row["status"],
             "service_name": row["service_name"],
+            "total_price": row["total_price"]
         }
         response_data = json.dumps(result).encode("utf-8")
         _set_headers(handler, 200, response_data)
@@ -129,7 +186,7 @@ def handle_create_booking(handler):
         return
 
     if not _check_availability(service_id, start_date, end_date, capacity_requested, service_capacity):
-        _send_error(handler, 400, "Capacità del servizio insufficiente per il periodo selezionato")
+        _send_error(handler, 400, "Disponibilita' del servizio insufficiente per il periodo selezionato")
         return
 
     # salvataggio prenotazione
@@ -202,11 +259,23 @@ def _save_booking(user_id, service_id, start_date, end_date, capacity_requested,
     try:
         with get_connection() as conn:
             c = conn.cursor()
+            
+            
+            c.execute("SELECT price FROM services WHERE id = ?", (service_id,))
+            service = c.fetchone()
+            if not service:
+                return None
+
+            daily_price = service["price"]
+            num_days = (end_date - start_date).days
+            total_price = daily_price * num_days * capacity_requested
+            
+            
             c.execute("""
-                INSERT INTO bookings (user_id, service_id, start_date, end_date, capacity_requested, status)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO bookings (user_id, service_id, start_date, end_date, capacity_requested, status, total_price)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             """, (user_id, service_id, start_date.strftime("%Y-%m-%d"),
-                  end_date.strftime("%Y-%m-%d"), capacity_requested, status))
+                  end_date.strftime("%Y-%m-%d"), capacity_requested, status, total_price))
             conn.commit()
             return c.lastrowid
     except sqlite3.IntegrityError:
