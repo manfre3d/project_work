@@ -161,14 +161,31 @@ function populateEditModal(booking) {
 
 
 async function populateAdminEditModal(booking) {
+  const serviceSelect = document.getElementById("editAdminService");
+  const startDateInput = document.getElementById("editAdminStartDate");
+  const endDateInput = document.getElementById("editAdminEndDate");
+  const totalPriceElement = document.getElementById("adminTotalPrice");
+
   document.getElementById("editAdminUser").value = booking.username || "N/A";
-  document.getElementById("editAdminStartDate").value = booking.start_date;
-  document.getElementById("editAdminEndDate").value = booking.end_date;
+  startDateInput.value = booking.start_date;
+  endDateInput.value = booking.end_date;
   document.getElementById("editAdminStatus").value = booking.status;
+
+  const updateTotalPrice = () => {
+    const pricePerDay = parseFloat(serviceSelect.options[serviceSelect.selectedIndex]?.dataset.price || 0);
+    const totalPrice = calculateTotalPrice(startDateInput.value, endDateInput.value, pricePerDay);
+    totalPriceElement.innerHTML = `<strong>Prezzo Totale:</strong> €${totalPrice.toFixed(2)}`;
+  };
 
   try {
     await loadServices();
-    document.getElementById("editAdminService").value = booking.service_id;
+    serviceSelect.value = booking.service_id;
+
+    serviceSelect.addEventListener("change", updateTotalPrice);
+    startDateInput.addEventListener("change", updateTotalPrice);
+    endDateInput.addEventListener("change", updateTotalPrice);
+
+    updateTotalPrice();
   } catch (error) {
     console.error(
       "Errore nel caricamento dei servizi per la modale admin:",
@@ -177,7 +194,6 @@ async function populateAdminEditModal(booking) {
     showModal("Errore", `Impossibile caricare i servizi: ${error.message}`);
     return;
   }
-  document.getElementById("editAdminService").value = booking.service_id;
 
   const editModal = new bootstrap.Modal(
     document.getElementById("editAdminBookingModal")
@@ -482,16 +498,16 @@ function renderAdminBookingList(bookings) {
         </button>
         <button class="btn btn-warning btn-sm" data-user-id="${
           booking.user_id
-        }" data-id="${booking.id}" data-status="pending">
+        }" data-id="${booking.id}" data-status="pending"">
           Rendi Pending
         <button 
           class="btn btn-primary btn-sm btn-edit"
-          data-id="${booking.id}"
+          data-id="${booking.id}" data-user-id="${booking.user_id}"
         >
           Modifica
         </button>
         <button 
-          class="btn btn-danger btn-sm btn-delete"
+          class="btn btn-danger btn-sm btn-delete" data-user-id="${booking.user_id}"
           data-id="${booking.id}"
         >
           Cancella
@@ -545,6 +561,7 @@ async function handleAdminEditBooking(bookingId) {
 async function saveAdminBooking() {
   const bookingId = selectedBookingId;
   const updatedBooking = {
+    user_id: document.getElementById("editAdminUser").value,
     service_id: document.getElementById("editAdminService").value,
     start_date: document.getElementById("editAdminStartDate").value,
     end_date: document.getElementById("editAdminEndDate").value,
@@ -602,7 +619,25 @@ export function attachAdminBookingEventHandlers() {
   document.querySelectorAll(".btn-delete").forEach((button) => {
     button.addEventListener("click", async (event) => {
       const bookingId = event.target.getAttribute("data-id");
-      updateBookingStatus(bookingId, "cancelled");
+      const userId = event.target.getAttribute("data-user-id");
+
+      updateBookingStatus(bookingId, "cancelled", userId);
+    });
+  });
+  document.querySelectorAll(".btn-warning").forEach((button) => {
+    button.addEventListener("click", async (event) => {
+      const bookingId = event.target.getAttribute("data-id");
+      const userId = event.target.getAttribute("data-user-id");
+
+      updateBookingStatus(bookingId, "pending", userId);
+    });
+  });
+  document.querySelectorAll(".btn-success").forEach((button) => {
+    button.addEventListener("click", async (event) => {
+      const bookingId = event.target.getAttribute("data-id");
+      const userId = event.target.getAttribute("data-user-id");
+
+      updateBookingStatus(bookingId, "confirmed", userId);
     });
   });
 }
