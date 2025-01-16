@@ -35,17 +35,22 @@ export function capitalizeFirstLetter(string) {
 
 export function updateBookingUIBasedOnRole(role) {
 
-  // sectionAdminBooking
-  // const adminOnlyElements = document.querySelectorAll(".admin-only");
-  // const userOnlyElements = document.querySelectorAll(".user-only");
-
   if (role === "admin") {
-    // adminOnlyElements.forEach((el) => (el.style.display = "block"));
-    // userOnlyElements.forEach((el) => (el.style.display = "none"));
     showSection(sectionAdminBooking);
   } else if (role === "user") {
-    // adminOnlyElements.forEach((el) => (el.style.display = "none"));
-    // userOnlyElements.forEach((el) => (el.style.display = "block"));
     showSection(sectionBookings);
   }
 }
+
+export function calculateTotalPrice(startDate, endDate, pricePerDay) {
+  if (!startDate || !endDate || !pricePerDay) return 0;
+
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+
+  if (isNaN(start) || isNaN(end)) return 0;
+
+  const days = (end - start) / (1000 * 60 * 60 * 24); 
+  return days > 0 ? days * pricePerDay : 0;
+}
+

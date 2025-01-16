@@ -1,5 +1,5 @@
 import { bookingList, formNewBooking } from "./references.js";
-import { showModal } from "./utility.js";
+import { showModal, calculateTotalPrice } from "./utility.js";
 
 // traccia l'id della prenotazione selezionata per modifica/eliminazione
 export let selectedBookingId = null;
@@ -17,7 +17,9 @@ function renderUserBookingList(bookings) {
 
     bookingItem.innerHTML = `
       <h3>${booking.service_name}</h3>
-      <p><strong>Periodo:</strong> dal ${booking.start_date} al ${booking.end_date}</p>
+      <p><strong>Periodo:</strong> dal ${booking.start_date} al ${
+      booking.end_date
+    }</p>
       <p><strong>Prezzo Totale:</strong> €${booking.total_price.toFixed(2)}</p>
       <p><strong>Stato:</strong> ${booking.status}</p>
       <div class="actions">
@@ -59,7 +61,7 @@ async function loadServices() {
     const services = await response.json();
 
     const editAdminServiceSelect = document.getElementById("editAdminService");
-    editAdminServiceSelect.innerHTML = ""; 
+    editAdminServiceSelect.innerHTML = "";
 
     services.forEach((service) => {
       const option = document.createElement("option");
@@ -69,7 +71,6 @@ async function loadServices() {
       editAdminServiceSelect.appendChild(option);
     });
 
-    // (Facoltativo) Se c'è una modale utente che richiede i servizi:
     const editServiceSelect = document.getElementById("editService");
     if (editServiceSelect) {
       editServiceSelect.innerHTML = ""; // Svuota le opzioni esistenti
@@ -78,6 +79,7 @@ async function loadServices() {
         const option = document.createElement("option");
         option.value = service.id;
         option.textContent = service.name;
+        option.dataset.price = service.price;
         editServiceSelect.appendChild(option);
       });
     }
@@ -112,7 +114,7 @@ async function handleEditBooking(event) {
     }
 
     const booking = await response.json();
-    populateEditModal(booking); 
+    populateEditModal(booking);
   } catch (error) {
     console.error("Errore nel recupero della prenotazione:", error);
     showModal(
@@ -127,24 +129,36 @@ async function handleEditBooking(event) {
  * @param {Object} booking - dati della prenotazione.
  */
 function populateEditModal(booking) {
-  document.getElementById("editService").value = booking.service_id;
-  document.getElementById("editStartDate").value = booking.start_date;
-  document.getElementById("editEndDate").value = booking.end_date;
-  document.getElementById("totalPrice").textContent = `Prezzo Totale: €${booking.total_price.toFixed(2)}`;
+  const serviceSelect = document.getElementById("editService");
+  const startDateInput = document.getElementById("editStartDate");
+  const endDateInput = document.getElementById("editEndDate");
+  const totalPriceElement = document.getElementById("userTotalPrice");
+
+  serviceSelect.value = booking.service_id;
+  startDateInput.value = booking.start_date;
+  endDateInput.value = booking.end_date;
+
+  const updateTotalPrice = () => {
+    const pricePerDay = parseFloat(serviceSelect.options[serviceSelect.selectedIndex]?.dataset.price || 0);
+    console.log("Prezzo giornaliero:", pricePerDay); 
+    const totalPrice = calculateTotalPrice(startDateInput.value, endDateInput.value, pricePerDay);
+    totalPriceElement.innerHTML = `Prezzo Totale: €${totalPrice.toFixed(2)}`;
+  };
+
+  // Aggiungi i listener per aggiornare il prezzo in tempo reale
+  serviceSelect.addEventListener("change", updateTotalPrice);
+  startDateInput.addEventListener("change", updateTotalPrice);
+  endDateInput.addEventListener("change", updateTotalPrice);
+
+  // Aggiorna il prezzo inizialmente
+  updateTotalPrice();
 
   const editModal = new bootstrap.Modal(
     document.getElementById("editBookingModal")
   );
   editModal.show();
-
-  editModal.setAttribute("aria-hidden", "false");
-
-
-  editModal.addEventListener("hidden.bs.modal", () => {
-    editModal.setAttribute("aria-hidden", "true");
-    document.getElementById("main-content").focus();
-  });
 }
+
 
 async function populateAdminEditModal(booking) {
   document.getElementById("editAdminUser").value = booking.username || "N/A";
@@ -153,8 +167,8 @@ async function populateAdminEditModal(booking) {
   document.getElementById("editAdminStatus").value = booking.status;
 
   try {
-    await loadServices(); // Popola il menu a discesa dei servizi
-    document.getElementById("editAdminService").value = booking.service_id; // Seleziona il servizio corrente
+    await loadServices();
+    document.getElementById("editAdminService").value = booking.service_id;
   } catch (error) {
     console.error(
       "Errore nel caricamento dei servizi per la modale admin:",
@@ -296,7 +310,7 @@ export async function populateServicesDropdown() {
 
     const services = await response.json();
     const serviceSelect = document.getElementById("service");
-    serviceSelect.innerHTML = ""; // Svuota le opzioni esistenti
+    serviceSelect.innerHTML = "";
 
     services.forEach((service) => {
       const option = document.createElement("option");
@@ -347,23 +361,13 @@ export function setupBookingHandler() {
         `La tua prenotazione con ID=${created.id} è stata creata con successo.`
       );
 
-      formNewBooking.reset(); // Resetta il form
+      formNewBooking.reset();
     } catch (error) {
       console.error("Errore nella creazione della prenotazione:", error);
       showModal("Errore", `Messaggio: ${error.message}`);
     }
   });
 }
-
-// collega il pulsante di conferma modifica nella modale
-document
-  .getElementById("confirmEditBtn")
-  .addEventListener("click", confirmEditBooking);
-
-// collega il pulsante di conferma eliminazione nella modale
-document
-  .getElementById("confirmDeleteBtn")
-  .addEventListener("click", confirmDeleteBooking);
 
 export async function loadAllBookings() {
   try {
@@ -383,9 +387,9 @@ export async function loadAllBookings() {
     const role = sessionStorage.getItem("userRole");
 
     if (role === "admin") {
-      renderAdminBookingList(bookings); // Funzione per renderizzare la tabella admin
+      renderAdminBookingList(bookings);
     } else {
-      renderUserBookingList(bookings); // Funzione per renderizzare la lista user
+      renderUserBookingList(bookings);
     }
   } catch (error) {
     console.error("Errore nel caricamento delle prenotazioni:", error);
@@ -423,7 +427,7 @@ async function updateBookingStatus(bookingId, newStatus, userId) {
       "Stato Aggiornato",
       `La prenotazione è stata aggiornata a "${newStatus}".`
     );
-    await loadAllBookings(); // Ricarica la lista delle prenotazioni
+    await loadAllBookings();
   } catch (error) {
     console.error("Errore nell'aggiornamento dello stato:", error);
     showModal("Errore", `Impossibile aggiornare lo stato: ${error.message}`);
@@ -474,7 +478,6 @@ function renderAdminBookingList(bookings) {
     adminTableBody.appendChild(row);
   });
 
-  // Collega gli eventi ai pulsanti
   attachAdminBookingEventHandlers();
 }
 
@@ -503,10 +506,7 @@ async function handleAdminEditBooking(bookingId) {
 
     const booking = await response.json();
 
-    // Popola il modale con i dati della prenotazione
     populateAdminEditModal(booking);
-
-
   } catch (error) {
     console.error("Errore nel caricamento della prenotazione:", error);
     showModal(
@@ -556,7 +556,7 @@ async function saveAdminBooking() {
       document.getElementById("editAdminBookingModal")
     );
     editModal.hide();
-    document.getElementById("admin-bookings").focus(); 
+    document.getElementById("admin-bookings").focus();
     await loadAllBookings(); // Ricarica la lista delle prenotazioni
   } catch (error) {
     console.error("Errore nel salvataggio della prenotazione:", error);
@@ -567,11 +567,6 @@ async function saveAdminBooking() {
   }
 }
 
-// Collega il pulsante di salvataggio nel modale
-document
-  .getElementById("saveAdminBookingBtn")
-  .addEventListener("click", saveAdminBooking);
-
 export function attachAdminBookingEventHandlers() {
   // Listener per i pulsanti "Modifica"
   document.querySelectorAll(".btn-edit").forEach((button) => {
@@ -581,7 +576,6 @@ export function attachAdminBookingEventHandlers() {
     });
   });
 
-  // Listener per i pulsanti "Cancella"
   document.querySelectorAll(".btn-delete").forEach((button) => {
     button.addEventListener("click", async (event) => {
       const bookingId = event.target.getAttribute("data-id");
@@ -589,3 +583,12 @@ export function attachAdminBookingEventHandlers() {
     });
   });
 }
+document
+  .getElementById("saveAdminBookingBtn")
+  .addEventListener("click", saveAdminBooking);
+document
+  .getElementById("confirmEditBtn")
+  .addEventListener("click", confirmEditBooking);
+document
+  .getElementById("confirmDeleteBtn")
+  .addEventListener("click", confirmDeleteBooking);
