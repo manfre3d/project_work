@@ -114,7 +114,7 @@ class MyHandler(BaseHTTPRequestHandler):
 def run_server(port=8000):
     """Avvia il server multi-threaded."""
     init_db()
-    server_address = ("", port)
+    server_address = ("0.0.0.0", port)
     httpd = ThreadingHTTPServer(server_address, MyHandler)
     print(f"Server multi-threaded in esecuzione sulla porta {port}...")
     try:
