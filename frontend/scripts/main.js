@@ -4,7 +4,7 @@ import {
   setupRegisterHandler,
   setupLogoutHandler,
 } from "./loginHandlers.js";
-import { setupBookingHandler, selectedBookingId } from "./bookingHandlers.js";
+import { setupBookingHandler } from "./bookingHandlers.js";
 import { sectionLogin } from "./references.js";
 
 function init() {

@@ -296,6 +296,8 @@ async function confirmDeleteBooking() {
 /**
  * Recupera i servizi dal server e popola il menu a discesa
  */
+
+// todo capire se ci sono ripetizione
 export async function populateServicesDropdown() {
   try {
     const response = await fetch("http://localhost:8000/services", {
@@ -316,6 +318,7 @@ export async function populateServicesDropdown() {
       const option = document.createElement("option");
       option.value = service.id;
       option.textContent = `${service.name} - ${service.description}`;
+      option.dataset.price = service.price;
       serviceSelect.appendChild(option);
     });
   } catch (error) {
@@ -328,15 +331,36 @@ export async function populateServicesDropdown() {
  * Configura il gestore per la creazione di una nuova prenotazione.
  */
 export function setupBookingHandler() {
+  const serviceSelect = document.getElementById("service");
+  const startDateInput = document.getElementById("start_date");
+  const endDateInput = document.getElementById("end_date");
+  const pricePreview = document.getElementById("pricePreview");
+
+  const updateTotalPrice = () => {
+    const pricePerDay = parseFloat(serviceSelect.options[serviceSelect.selectedIndex]?.dataset.price || 0);
+    console.log("Prezzo giornaliero:", pricePerDay);
+    const totalPrice = calculateTotalPrice(startDateInput.value, endDateInput.value, pricePerDay);
+    console.log("Prezzo totale calcolato:", totalPrice);
+    pricePreview.innerHTML = `<strong>Prezzo Totale:</strong> €${totalPrice.toFixed(2)}`;
+  };
+
+  serviceSelect.addEventListener("change", updateTotalPrice);
+  startDateInput.addEventListener("change", updateTotalPrice);
+  endDateInput.addEventListener("change", updateTotalPrice);
+
   formNewBooking.addEventListener("submit", async (e) => {
     // Evita il comportamento predefinito del form (ricaricamento della pagina)
     e.preventDefault();
 
-    const service_id = document.getElementById("service").value;
-    const start_date = document.getElementById("start_date").value;
-    const end_date = document.getElementById("end_date").value;
+    const service_id = serviceSelect.value;
+    const start_date = startDateInput.value;
+    const end_date = endDateInput.value;
 
-    const newBooking = { service_id, start_date, end_date };
+    const pricePerDay = parseFloat(serviceSelect.options[serviceSelect.selectedIndex]?.dataset.price || 0);
+    const total_price = calculateTotalPrice(start_date, end_date, pricePerDay);
+
+    
+    const newBooking = { service_id, start_date, end_date, total_price };
 
     try {
       const response = await fetch("http://localhost:8000/bookings", {
@@ -350,9 +374,7 @@ export function setupBookingHandler() {
 
       if (!response.ok) {
         const errorMsg = await response.json();
-        throw new Error(
-          errorMsg.errore || "Errore nella creazione prenotazione"
-        );
+        throw new Error(errorMsg.errore || "Errore nella creazione prenotazione");
       }
 
       const created = await response.json();
@@ -362,6 +384,7 @@ export function setupBookingHandler() {
       );
 
       formNewBooking.reset();
+      pricePreview.innerHTML = `<strong>Prezzo Totale:</strong> €0.00`; 
     } catch (error) {
       console.error("Errore nella creazione della prenotazione:", error);
       showModal("Errore", `Messaggio: ${error.message}`);
