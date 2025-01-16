@@ -1,23 +1,26 @@
 import {
   btnLogin,
-  btnLogout,
   btnBookings,
   btnNewBooking,
   sectionLogin,
   sectionBookings,
   sectionNewBooking,
-  currentUserId
+  currentUserId,
+  sectionAdminBooking
 } from "./references.js";
 import { loadAllBookings } from "./bookingHandlers.js";
 import { populateServicesDropdown } from "./bookingHandlers.js";
-import { showModal } from "./utility.js";
+import { 
+  showModal,
+  updateBookingUIBasedOnRole
+} from "./utility.js";
 
 export function showSection(section) {
-  // nascondi tutte
+  
   sectionLogin.classList.remove("active");
   sectionBookings.classList.remove("active");
   sectionNewBooking.classList.remove("active");
-  // mostra la sezione selezionata
+  sectionAdminBooking.classList.remove("active");
   section.classList.add("active");
 }
 
@@ -26,8 +29,13 @@ function handleBtnLoginClick() {
 }
 
 function handleBtnBookingsClick() {
-  showSection(sectionBookings);
-  // carica e mostra tutte le prenotazioni
+  if (!currentUserId) {
+    showModal("Attenzione","Devi effettuare il login per visualizzare le prenotazioni!");
+    showSection(sectionLogin);
+    return;
+  }
+  updateBookingUIBasedOnRole(sessionStorage.getItem("userRole"));
+  // showSection(sectionBookings);
   loadAllBookings();
 }
 
@@ -37,7 +45,6 @@ function handleBtnNewBookingClick() {
     showSection(sectionLogin);
     return;
   }
-  // Popola i servizi disponibili
   populateServicesDropdown();
   showSection(sectionNewBooking);
 }

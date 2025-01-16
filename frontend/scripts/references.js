@@ -9,6 +9,7 @@ export const btnRegister = document.getElementById("btn-register")
 export const sectionLogin = document.getElementById("section-login");
 export const sectionBookings = document.getElementById("section-bookings");
 export const sectionNewBooking = document.getElementById("section-new-booking");
+export const sectionAdminBooking = document.getElementById("admin-bookings");
 
 // Altre variabili
 export const loginForm = document.getElementById("login-form");

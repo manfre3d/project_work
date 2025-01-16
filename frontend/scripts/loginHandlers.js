@@ -3,13 +3,16 @@ import { showSection } from "./navigationHandlers.js";
 import {
   loginForm,
   btnLogout,
-  sectionBookings,
   sectionLogin,
   setCurrentUserId,
   btnConfirmRegister,
   btnRegister,
+  btnLogin,
+
 } from "./references.js";
+import { updateBookingUIBasedOnRole } from "./utility.js";
 import { loadAllBookings } from "./bookingHandlers.js";
+
 
 export function setupLoginHandler() {
   loginForm.addEventListener("submit", async (e) => {
@@ -38,14 +41,21 @@ export function setupLoginHandler() {
 
       // Imposta l'utente corrente
       setCurrentUserId(userData.id);
+      // salva il ruolo dell'utente in sessionStorage - storage persistente fino alla chiusura della finestra del browser
+      sessionStorage.setItem("userRole", userData.role);
 
       showModal("Login effettuato", `Bentornato, ${userData.username}!`);
-      // mostra il pulsante logout
+      
+      // Mostra/nascondi elementi basati sul ruolo
+      updateBookingUIBasedOnRole(userData.role);  
+      loadAllBookings(); 
+      
+      
+      // Mostra il pulsante logout e nasconde il pulsante di registrazione
+      btnLogin.style.display = "none";
       btnLogout.style.display = "inline-block";
       btnRegister.style.display = "none";
-      // naviga alla sezione prenotazioni
-      await loadAllBookings();
-      showSection(sectionBookings);
+
     } catch (error) {
       console.error("Errore durante il login:", error);
       showModal("Errore", `Login fallito: ${error.message}`);
@@ -73,11 +83,14 @@ export function setupLogoutHandler() {
 
       // mostra un messaggio di conferma logout
       showModal("Logout effettuato", "Sei stato disconnesso con successo.");
+      sessionStorage.setItem("userRole", null);
+      // Imposta l'utente corrente
+      setCurrentUserId(null);
 
       // nascondi il pulsante logout
       btnLogout.style.display = "none";
       btnRegister.style.display = "inline-block";
-
+      btnLogin.style.display = "inline-block";
       // mostra la sezione di login
       showSection(sectionLogin);
     } catch (error) {
