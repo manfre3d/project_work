@@ -293,7 +293,6 @@ def handle_update_booking(handler, booking_id):
     """
     verify_session(handler)
 
-    # logica per aggiornare la prenotazione
     try:
         booking_id = int(booking_id)
     except ValueError:
@@ -302,6 +301,7 @@ def handle_update_booking(handler, booking_id):
         handler.wfile.write(error_response)
         return
 
+    
     content_length = int(handler.headers.get("Content-Length", 0))
     body = handler.rfile.read(content_length).decode("utf-8")
 
@@ -314,7 +314,6 @@ def handle_update_booking(handler, booking_id):
         return
 
     user_id = data.get("user_id") if data.get("user_id") else extrapolate_user_id_from_session(handler)
-
     service_id = data.get("service_id")
     start_date = data.get("start_date")
     end_date = data.get("end_date")
@@ -322,6 +321,8 @@ def handle_update_booking(handler, booking_id):
 
     with get_connection() as conn:
         c = conn.cursor()
+        
+        
         c.execute("""
             SELECT * FROM bookings WHERE id = ? AND user_id = ?
         """, (booking_id, user_id))
@@ -338,23 +339,57 @@ def handle_update_booking(handler, booking_id):
         updated_end_date = end_date or row["end_date"]
         updated_status = status or row["status"]
 
+        
+        c.execute("""
+            SELECT price FROM services WHERE id = ?
+        """, (updated_service_id,))
+        service = c.fetchone()
+
+        if not service:
+            error_response = json.dumps({"error": "Servizio non trovato"}).encode("utf-8")
+            _set_headers(handler, 404, error_response)
+            handler.wfile.write(error_response)
+            return
+
+        daily_price = float(service["price"])
+        try:
+            start_date_obj = datetime.strptime(updated_start_date, "%Y-%m-%d").date()
+            end_date_obj = datetime.strptime(updated_end_date, "%Y-%m-%d").date()
+        except ValueError:
+            error_response = json.dumps({"error": "Formato della data non valido"}).encode("utf-8")
+            _set_headers(handler, 400, error_response)
+            handler.wfile.write(error_response)
+            return
+
+        num_days = (end_date_obj - start_date_obj).days
+        if num_days <= 0:
+            error_response = json.dumps({"error": "La data di fine deve essere successiva alla data di inizio"}).encode("utf-8")
+            _set_headers(handler, 400, error_response)
+            handler.wfile.write(error_response)
+            return
+
+        total_price = daily_price * num_days
+
+        
         c.execute("""
             UPDATE bookings
-            SET service_id = ?, start_date = ?, end_date = ?, status = ?
+            SET service_id = ?, start_date = ?, end_date = ?, status = ?, total_price = ?
             WHERE id = ? AND user_id = ?
-        """, (updated_service_id, updated_start_date, updated_end_date, updated_status, booking_id, user_id))
+        """, (updated_service_id, updated_start_date, updated_end_date, updated_status, total_price, booking_id, user_id))
         conn.commit()
 
+    
     response_data = {
         "id": booking_id,
         "service_id": updated_service_id,
         "start_date": updated_start_date,
         "end_date": updated_end_date,
-        "status": updated_status
+        "status": updated_status,
+        "total_price": total_price
     }
     _set_headers(handler, 200, json.dumps(response_data).encode("utf-8"))
     handler.wfile.write(json.dumps(response_data).encode("utf-8"))
-    
+
 def handle_delete_booking(handler, booking_id):
     """DELETE /bookings/<id> - Elimina una prenotazione."""
     try:
