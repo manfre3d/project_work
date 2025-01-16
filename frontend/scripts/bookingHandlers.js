@@ -3,6 +3,7 @@ import { showModal, calculateTotalPrice } from "./utility.js";
 
 // traccia l'id della prenotazione selezionata per modifica/eliminazione
 export let selectedBookingId = null;
+export let selectedUserId = null;
 
 /**
  * aggiorna la lista delle prenotazioni nel DOM.
@@ -10,6 +11,10 @@ export let selectedBookingId = null;
  */
 function renderUserBookingList(bookings) {
   bookingList.innerHTML = "";
+  if(bookings.length === 0) 
+    bookingList.innerHTML = `
+  <h5>Nessuna prenotazione trovata.</h5>
+  `;
 
   bookings.forEach((booking) => {
     const bookingItem = document.createElement("div");
@@ -23,8 +28,8 @@ function renderUserBookingList(bookings) {
       <p><strong>Prezzo Totale:</strong> €${booking.total_price.toFixed(2)}</p>
       <p><strong>Stato:</strong> ${booking.status}</p>
       <div class="actions">
-        <button class="btn btn-edit" data-id="${booking.id}">Modifica</button>
-        <button class="btn btn-delete" data-id="${booking.id}">Elimina</button>
+        <button class="btn btn-edit btn-user-edit" data-id="${booking.id}">Modifica</button>
+        <button class="btn btn-delete btn-user-delete" data-id="${booking.id}">Elimina</button>
       </div>
     `;
     bookingList.appendChild(bookingItem);
@@ -38,11 +43,11 @@ function renderUserBookingList(bookings) {
  */
 function attachEventHandlers() {
   document
-    .querySelectorAll(".btn-edit")
+    .querySelectorAll(".btn-user-edit")
     .forEach((btn) => btn.addEventListener("click", handleEditBooking));
 
   document
-    .querySelectorAll(".btn-delete")
+    .querySelectorAll(".btn-user-delete")
     .forEach((btn) => btn.addEventListener("click", handleDeleteBooking));
 }
 
@@ -258,7 +263,9 @@ async function confirmEditBooking() {
  */
 async function handleDeleteBooking(event) {
   selectedBookingId = event.target.dataset.id;
-
+  
+  const confirmDeleteBtn = document.getElementById("confirmDeleteBtn");
+  confirmDeleteBtn.setAttribute("data-context", "user");
   const confirmDeleteModal = new bootstrap.Modal(
     document.getElementById("confirmDeleteModal")
   );
@@ -269,7 +276,11 @@ async function handleDeleteBooking(event) {
  * conferma l'eliminazione della prenotazione selezionata.
  */
 async function confirmDeleteBooking() {
-  if (!selectedBookingId) return;
+  const deleteContext = document
+    .getElementById("confirmDeleteBtn")
+    .getAttribute("data-context");
+
+  if (!selectedBookingId || !deleteContext) return;
 
   try {
     const response = await fetch(
@@ -292,13 +303,28 @@ async function confirmDeleteBooking() {
     );
     confirmDeleteModal.hide();
 
-    document
-      .querySelector(`[data-id="${selectedBookingId}"]`)
-      .parentElement.remove();
+    if (deleteContext === "admin") {
+      const adminTableBody = document.getElementById("admin-bookings-tbody");
+      const rows = adminTableBody.querySelectorAll("tr");
+
+      rows.forEach((row) => {
+        const idCell = row.querySelector("td:first-child");
+        if (idCell && idCell.textContent.trim() === selectedBookingId) {
+          row.remove();
+        }
+      });
+    } else if (deleteContext === "user") {
+      const cardToDelete = document.querySelector(
+        `.btn-user-delete[data-id="${selectedBookingId}"]`
+      )?.closest(".booking-item");
+      if (cardToDelete) cardToDelete.remove();
+    }
+
     showModal(
       "Prenotazione eliminata",
-      "La prenotazione è stata eliminata con successo."
+      `La prenotazione con ID=${selectedBookingId} è stata eliminata con successo.`
     );
+
     selectedBookingId = null;
   } catch (error) {
     console.error("Errore nell'eliminazione della prenotazione:", error);
@@ -308,6 +334,7 @@ async function confirmDeleteBooking() {
     );
   }
 }
+
 
 /**
  * Recupera i servizi dal server e popola il menu a discesa
@@ -491,27 +518,34 @@ function renderAdminBookingList(bookings) {
       <td>€${booking.total_price.toFixed(2)}</td> 
       <td>${booking.status}</td>
       <td>
-        <button class="btn btn-success btn-sm" data-user-id="${
+        <button 
+          class="btn btn-success btn-sm btn-admin-table-success" data-user-id="${
           booking.user_id
         }" data-id="${booking.id}" data-status="confirmed">
           Conferma
         </button>
-        <button class="btn btn-warning btn-sm" data-user-id="${
+        <button class="btn btn-warning btn-sm btn-admin-table-pending" data-user-id="${
           booking.user_id
         }" data-id="${booking.id}" data-status="pending"">
           Rendi Pending
         <button 
-          class="btn btn-primary btn-sm btn-edit"
+          class="btn btn-primary btn-sm btn-edit btn-admin-table-edit"
           data-id="${booking.id}" data-user-id="${booking.user_id}"
         >
           Modifica
         </button>
         <button 
-          class="btn btn-danger btn-sm btn-delete" data-user-id="${booking.user_id}"
+          class="btn btn-danger btn-sm btn-delete btn-admin-table-cancel" data-user-id="${booking.user_id}"
           data-id="${booking.id}"
         >
           Cancella
         </button>
+        <button 
+          class="btn btn-danger btn-sm btn-delete btn-admin-table-delete" data-user-id="${booking.user_id}"
+          data-id="${booking.id}">
+            Elimina
+        </button>
+        
       </td>
     `;
     adminTableBody.appendChild(row);
@@ -524,9 +558,9 @@ function renderAdminBookingList(bookings) {
  * Mostra il modale per la modifica di una prenotazione (Admin).
  * @param {number} bookingId - ID della prenotazione da modificare.
  */
-async function handleAdminEditBooking(bookingId) {
+async function handleAdminEditBooking(bookingId, userId) {
   selectedBookingId = bookingId;
-
+  selectedUserId = userId;
   try {
     const response = await fetch(
       `http://localhost:8000/bookings/${bookingId}`,
@@ -561,7 +595,7 @@ async function handleAdminEditBooking(bookingId) {
 async function saveAdminBooking() {
   const bookingId = selectedBookingId;
   const updatedBooking = {
-    user_id: document.getElementById("editAdminUser").value,
+    user_id: selectedUserId,
     service_id: document.getElementById("editAdminService").value,
     start_date: document.getElementById("editAdminStartDate").value,
     end_date: document.getElementById("editAdminEndDate").value,
@@ -580,7 +614,7 @@ async function saveAdminBooking() {
         body: JSON.stringify(updatedBooking),
       }
     );
-
+    selectedUserId = null;
     if (!response.ok) {
       const errMsg = await response.json();
       throw new Error(
@@ -609,14 +643,15 @@ async function saveAdminBooking() {
 
 export function attachAdminBookingEventHandlers() {
   // Listener per i pulsanti "Modifica"
-  document.querySelectorAll(".btn-edit").forEach((button) => {
+  document.querySelectorAll(".btn-admin-table-edit").forEach((button) => {
     button.addEventListener("click", async (event) => {
       const bookingId = event.target.getAttribute("data-id");
-      handleAdminEditBooking(bookingId);
+      const userId = event.target.getAttribute("data-user-id");
+      handleAdminEditBooking(bookingId,userId);
     });
   });
 
-  document.querySelectorAll(".btn-delete").forEach((button) => {
+  document.querySelectorAll(".btn-admin-table-cancel").forEach((button) => {
     button.addEventListener("click", async (event) => {
       const bookingId = event.target.getAttribute("data-id");
       const userId = event.target.getAttribute("data-user-id");
@@ -624,7 +659,7 @@ export function attachAdminBookingEventHandlers() {
       updateBookingStatus(bookingId, "cancelled", userId);
     });
   });
-  document.querySelectorAll(".btn-warning").forEach((button) => {
+  document.querySelectorAll(".btn-admin-table-pending").forEach((button) => {
     button.addEventListener("click", async (event) => {
       const bookingId = event.target.getAttribute("data-id");
       const userId = event.target.getAttribute("data-user-id");
@@ -632,13 +667,28 @@ export function attachAdminBookingEventHandlers() {
       updateBookingStatus(bookingId, "pending", userId);
     });
   });
-  document.querySelectorAll(".btn-success").forEach((button) => {
+  document.querySelectorAll(".btn-admin-table-success").forEach((button) => {
     button.addEventListener("click", async (event) => {
       const bookingId = event.target.getAttribute("data-id");
       const userId = event.target.getAttribute("data-user-id");
 
       updateBookingStatus(bookingId, "confirmed", userId);
     });
+  });
+  document.querySelectorAll(".btn-admin-table-delete").forEach((button) => {
+    button.addEventListener("click", async (event) => {
+        const bookingId = event.target.getAttribute("data-id");
+        selectedBookingId = bookingId;
+    
+        const confirmDeleteBtn = document.getElementById("confirmDeleteBtn");
+        confirmDeleteBtn.setAttribute("data-context", "admin");
+    
+
+        const confirmDeleteModal = new bootstrap.Modal(
+          document.getElementById("confirmDeleteModal")
+        );
+        confirmDeleteModal.show();
+      });
   });
 }
 document
