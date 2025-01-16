@@ -524,10 +524,6 @@ function renderAdminBookingList(bookings) {
         }" data-id="${booking.id}" data-status="confirmed">
           Conferma
         </button>
-        <button class="btn btn-warning btn-sm btn-admin-table-pending" data-user-id="${
-          booking.user_id
-        }" data-id="${booking.id}" data-status="pending"">
-          Rendi Pending
         <button 
           class="btn btn-primary btn-sm btn-edit btn-admin-table-edit"
           data-id="${booking.id}" data-user-id="${booking.user_id}"
@@ -540,12 +536,16 @@ function renderAdminBookingList(bookings) {
         >
           Cancella
         </button>
+        <button class="btn btn-warning btn-sm btn-admin-table-pending" data-user-id="${
+          booking.user_id
+        }" data-id="${booking.id}" data-status="pending"">
+          Rendi Pending
+        </button>
         <button 
           class="btn btn-danger btn-sm btn-delete btn-admin-table-delete" data-user-id="${booking.user_id}"
           data-id="${booking.id}">
             Elimina
         </button>
-        
       </td>
     `;
     adminTableBody.appendChild(row);
