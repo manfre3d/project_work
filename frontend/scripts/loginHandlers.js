@@ -16,7 +16,7 @@ export async function initializeApp() {
 
   console.log("Inizializzazione app...");
   try {
-    const response = await fetch("http://localhost:8000/current-user", {
+    const response = await fetch("/current-user", {
       method: "GET",
       credentials: "include",
     });
