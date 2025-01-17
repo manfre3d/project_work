@@ -1,11 +1,7 @@
 import { modalTitleEl, modalBodyEl } from "./references.js";
 
-import {
-  sectionBookings,
-  sectionAdminBooking
-} from "./references.js";
+import { sectionBookings, sectionAdminBooking } from "./references.js";
 import { showSection } from "./navigationHandlers.js";
-
 
 export function showModal(title, message) {
   modalTitleEl.textContent = title;
@@ -28,13 +24,11 @@ export function showModal(title, message) {
   });
 }
 
-
 export function capitalizeFirstLetter(string) {
   return string.charAt(0).toUpperCase() + string.slice(1);
 }
 
 export function updateBookingUIBasedOnRole(role) {
-
   if (role === "admin") {
     showSection(sectionAdminBooking);
   } else if (role === "user") {
@@ -50,7 +44,6 @@ export function calculateTotalPrice(startDate, endDate, pricePerDay) {
 
   if (isNaN(start) || isNaN(end)) return 0;
 
-  const days = (end - start) / (1000 * 60 * 60 * 24); 
+  const days = (end - start) / (1000 * 60 * 60 * 24);
   return days > 0 ? days * pricePerDay : 0;
 }
-

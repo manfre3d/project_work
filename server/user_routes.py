@@ -80,7 +80,7 @@ def handle_login(handler):
         error_response = json.dumps({"error": "Username o password errati"}).encode("utf-8")
         _set_headers(handler, 401, error_response)
         handler.wfile.write(error_response)
-               
+
 def handle_logout(handler):
     """POST /logout - Elimina la sessione dell'utente."""
     cookies = handler.headers.get("Cookie")
@@ -179,7 +179,50 @@ def handle_get_user_by_id(handler, user_id):
         _set_headers(handler, 404, error_response)
         handler.wfile.write(error_response)
     
+def handle_get_current_user(handler):
+    """
+    GET /current-user
+    Ritorna i dettagli dell'utente autenticato in base al cookie session_id.
+    """
+    session_id = handler.headers.get("Cookie", "").split("session_id=")[-1].split(";")[0]
+    
+    if not session_id:
+        error_response = json.dumps({"error": "Sessione non trovata"}).encode("utf-8")
+        _set_headers(handler, 401, error_response)
+        print("sessione non valida")
+        
+        handler.wfile.write(error_response)
+        return
 
+    with get_connection() as conn:
+        c = conn.cursor()
+        c.execute("""
+            SELECT u.id, u.username, u.email, u.role
+            FROM sessions s
+            JOIN users u ON s.user_id = u.id
+            WHERE s.session_id = ?
+        """, (session_id,))
+        user = c.fetchone()
+
+    if user:
+        response = {
+            "id": user["id"],
+            "username": user["username"],
+            "email": user["email"],
+            "role": user["role"]
+        }
+        response_data = json.dumps(response).encode("utf-8")
+        print(response_data)
+        _set_headers(handler, 200, response_data)
+        handler.wfile.write(response_data)
+    else:
+        error_response = json.dumps({"error": "Sessione non valida"}).encode("utf-8")
+        print("sessione non valida")
+        
+        _set_headers(handler, 401, error_response)
+        handler.wfile.write(error_response)
+        
+        
 def handle_create_user(handler):
     """POST /users - Crea un nuovo utente nel DB."""
     content_length = int(handler.headers.get("Content-Length", 0))

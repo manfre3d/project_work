@@ -7,12 +7,41 @@ import {
   setCurrentUserId,
   btnConfirmRegister,
   btnRegister,
-  btnLogin,
-
+  btnLogin
 } from "./references.js";
 import { updateBookingUIBasedOnRole } from "./utility.js";
 import { loadAllBookings } from "./bookingHandlers.js";
 
+export async function initializeApp() {
+
+  console.log("Inizializzazione app...");
+  try {
+    const response = await fetch("http://localhost:8000/current-user", {
+      method: "GET",
+      credentials: "include",
+    });
+
+    if (response.ok) {
+      const userData = await response.json();
+
+      setCurrentUserId(userData.id);
+      sessionStorage.setItem("userRole", userData.role);
+
+      showModal("Login effettuato", `Bentornato, ${userData.username}!`);
+
+      updateBookingUIBasedOnRole(userData.role);
+      loadAllBookings();
+
+      btnLogin.style.display = "none";
+      btnLogout.style.display = "inline-block";
+      btnRegister.style.display = "none";
+    } else {
+      console.log("Sessione scaduta. Richiedere il login.");
+    }
+  } catch (error) {
+    console.error("Errore durante il recupero dell'utente:", error);
+  }
+}
 
 export function setupLoginHandler() {
   loginForm.addEventListener("submit", async (e) => {
@@ -45,17 +74,15 @@ export function setupLoginHandler() {
       sessionStorage.setItem("userRole", userData.role);
 
       showModal("Login effettuato", `Bentornato, ${userData.username}!`);
-      
+
       // Mostra/nascondi elementi basati sul ruolo
-      updateBookingUIBasedOnRole(userData.role);  
-      loadAllBookings(); 
-      
-      
+      updateBookingUIBasedOnRole(userData.role);
+      loadAllBookings();
+
       // Mostra il pulsante logout e nasconde il pulsante di registrazione
       btnLogin.style.display = "none";
       btnLogout.style.display = "inline-block";
       btnRegister.style.display = "none";
-
     } catch (error) {
       console.error("Errore durante il login:", error);
       showModal("Errore", `Login fallito: ${error.message}`);
@@ -104,7 +131,6 @@ export function setupRegisterHandler() {
   //form di registrazione
 
   btnConfirmRegister.addEventListener("click", async () => {
-
     const form = document.getElementById("register-form");
     if (!form.checkValidity()) {
       form.reportValidity();

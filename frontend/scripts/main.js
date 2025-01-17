@@ -1,5 +1,6 @@
 import { setupNavHandlers, showSection } from "./navigationHandlers.js";
 import {
+  initializeApp,
   setupLoginHandler,
   setupRegisterHandler,
   setupLogoutHandler,
@@ -25,7 +26,9 @@ function init() {
 
   // mostra la sezione login all'avvio
   showSection(sectionLogin);
-
+  
+  // inizializza l'applicazione verificando se è presente un utente loggato
+  initializeApp();
   
 }
 

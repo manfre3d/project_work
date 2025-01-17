@@ -8,6 +8,7 @@ from booking_routes import (
 )
 from utility.utility import _set_headers, parse_path, parse_query
 from user_routes import (
+    handle_get_current_user,
     handle_login,
     handle_get_all_users,
     handle_get_user_by_id,
@@ -117,7 +118,14 @@ def route_request(handler, method):
             else:
                 handle_404(handler)
         return
-
+    
+    # rotta per il logout
+    if resource == "current-user":
+        if method == "GET":
+            handle_get_current_user(handler)
+        else:
+            handle_404(handler)
+        return
     # se la rotta non è trovata
     handle_404(handler)
 
