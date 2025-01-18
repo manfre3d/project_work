@@ -1,6 +1,5 @@
 import json
 import os
-import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from routes import route_request
 from db import init_db

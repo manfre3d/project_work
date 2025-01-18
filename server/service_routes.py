@@ -1,8 +1,6 @@
 import json
 from db import get_connection
-from authentication import verify_authentication
 from utility.utility import set_headers
-from user_routes import authenticate
 
 
 def handle_get_all_services(handler):

@@ -1,7 +1,7 @@
 import json
 import sqlite3
 from db import get_connection
-from authentication import authenticate
+from utility.authentication import authenticate
 from utility.session import get_session_id, get_user_id_from_session
 from utility.utility import (
     set_headers,

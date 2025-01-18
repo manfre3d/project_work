@@ -6,7 +6,7 @@ from booking_routes import (
     handle_update_booking,
     handle_delete_booking
 )
-from utility.utility import set_headers, parse_path, parse_query
+from utility.utility import set_headers, parse_path
 from user_routes import (
     handle_get_current_user,
     handle_login,
@@ -24,7 +24,7 @@ from service_routes import (
     handle_update_service,
     handle_delete_service
 )
-from authentication import verify_authentication
+from utility.authentication import verify_authentication
 
 def route_request(handler, method):
     # rotte publiche che non richiedono autenticazione

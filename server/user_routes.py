@@ -1,7 +1,7 @@
 import json
 import sqlite3
 from db import get_connection
-from authentication import authenticate
+from utility.authentication import authenticate
 from utility.utility import set_headers
 from utility.session import create_session, delete_session
 
