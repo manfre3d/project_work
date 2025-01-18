@@ -28,41 +28,23 @@ from authentication import verify_authentication
 
 def route_request(handler, method):
     # rotte publiche che non richiedono autenticazione
-    public_routes = [("login", "POST"), ("logout", "POST"),("users","POST")]
+    public_routes = [
+        ("login", "POST"),
+        ("logout", "POST"),
+        ("users","POST")
+    ]
 
     # logica per analizzare il percorso della richiesta
-    print(f"Routing request: path={handler.path}, method={method}")
     resource, resource_id = parse_path(handler.path)
     query_params = parse_query(handler.path)
-    print(f"Parsed path: resource={resource}, resource_id={resource_id}, query={query_params}")
 
-    # Log aggiuntivo per verificare autenticazione
     if (resource, method) not in public_routes:
         authenticated_user = verify_authentication(handler)
         if not authenticated_user:
             print("Autenticazione fallita!")
             return
         print(f"Utente autenticato: {authenticated_user}")
-    # rotta per i servizi
-    if resource == "services":
-        if resource_id is None:
-            if method == "GET":
-                handle_get_all_services(handler)
-            elif method == "POST":
-                handle_create_service(handler)
-            else:
-                handle_404(handler)
-        else:
-            if method == "GET":
-                handle_get_service_by_id(handler, resource_id)
-            elif method == "PUT":
-                handle_update_service(handler, resource_id)
-            elif method == "DELETE":
-                handle_delete_service(handler, resource_id)
-            else:
-                handle_404(handler)
-        return
-
+        
     # rotta per le prenotazioni
     if resource == "bookings":
         if resource_id is None:
@@ -79,6 +61,26 @@ def route_request(handler, method):
                 handle_update_booking(handler, resource_id)
             elif method == "DELETE":
                 handle_delete_booking(handler, resource_id)
+            else:
+                handle_404(handler)
+        return
+
+    # rotta per i servizi
+    if resource == "services":
+        if resource_id is None:
+            if method == "GET":
+                handle_get_all_services(handler)
+            elif method == "POST":
+                handle_create_service(handler)
+            else:
+                handle_404(handler)
+        else:
+            if method == "GET":
+                handle_get_service_by_id(handler, resource_id)
+            elif method == "PUT":
+                handle_update_service(handler, resource_id)
+            elif method == "DELETE":
+                handle_delete_service(handler, resource_id)
             else:
                 handle_404(handler)
         return
@@ -119,7 +121,7 @@ def route_request(handler, method):
                 handle_404(handler)
         return
     
-    # rotta per il logout
+    # rotta per determinare se è presente un utente autenticato
     if resource == "current-user":
         if method == "GET":
             handle_get_current_user(handler)

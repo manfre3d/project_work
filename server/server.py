@@ -22,15 +22,13 @@ class MyHandler(BaseHTTPRequestHandler):
         set_headers(self, 200)
 
     def do_GET(self):
-        """Gestisce le richieste GET."""
+        """Gestisce le richieste GET. E inoltre serve file statici del front end."""
         # serve/fornisce i file statici dalla cartella 'frontend'        
-        if self.path.startswith("/frontend") or self.path == "/" or self.path.endswith((".html", ".css", ".js", ".png", ".jpg", ".jpeg", ".ico", ".svg")):
+        if self.path.startswith("/frontend") or self.path == "/" or self.path.endswith(
+            (".html", ".css", ".js", ".png", ".jpg", ".jpeg", ".ico", ".svg")):
             self.serve_static_file()
         else:
             # gestione di richieste API
-            # The `route_request` function is responsible for handling API requests based on the HTTP
-            # method (GET, POST, PUT, DELETE). It is called from the `do_GET`, `do_POST`, `do_PUT`,
-            # and `do_DELETE` methods in the `MyHandler` class.
             route_request(self, "GET")
 
     def serve_static_file(self):
@@ -53,15 +51,7 @@ class MyHandler(BaseHTTPRequestHandler):
         # verifica se il file esiste
         if os.path.isfile(file_path):
             try:
-                with open(file_path, "rb") as f:
-                    file_content = f.read()
-
-                content_type = self._get_content_type(file_path)
-                
-                set_headers(self, 200, file_content, content_type)
-                self.wfile.write(file_content)
-                
-                print(f"Servito file statico: {file_path}")
+                self._read_and_send_file(file_path)
             except Exception as e:
                 print(f"Errore durante il caricamento del file statico: {e}")
                 error_response = json.dumps({"error": "Errore interno del server"}).encode("utf-8")
@@ -74,7 +64,7 @@ class MyHandler(BaseHTTPRequestHandler):
             # todo: inserire nel metodo set_headers self.wfile.write(***) visto che passo il parametro response_data
             self.wfile.write(error_response)
 
-    def _serve_file(self, file_path):
+    def _read_and_send_file(self, file_path):
         """Serve un singolo file statico."""
         with open(file_path, "rb") as f:
             file_content = f.read()
