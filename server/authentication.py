@@ -1,6 +1,6 @@
 import json
 from db import get_connection
-from utility.utility import _set_headers
+from utility.utility import set_headers
 from utility.session import get_user_id_from_session
 
 
@@ -45,7 +45,7 @@ def verify_authentication(handler):
     
     if not authenticated_user:
         error_response = json.dumps({"error": "E' necessario autenticarsi!"}).encode("utf-8")
-        _set_headers(handler, 401, error_response)
+        set_headers(handler, 401, error_response)
         handler.wfile.write(error_response)
         handler.close_connection = True
         return None

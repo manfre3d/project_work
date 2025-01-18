@@ -6,7 +6,7 @@ from booking_routes import (
     handle_update_booking,
     handle_delete_booking
 )
-from utility.utility import _set_headers, parse_path, parse_query
+from utility.utility import set_headers, parse_path, parse_query
 from user_routes import (
     handle_get_current_user,
     handle_login,
@@ -133,5 +133,5 @@ def route_request(handler, method):
 
 def handle_404(handler):
     error_response = json.dumps({"error": "Rotta non trovata"}).encode("utf-8")
-    _set_headers(handler, 404,error_response)
+    set_headers(handler, 404,error_response)
     handler.wfile.write(error_response)

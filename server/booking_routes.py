@@ -4,7 +4,7 @@ from db import get_connection
 from authentication import authenticate
 from utility.session import get_session_id, get_user_id_from_session
 from utility.utility import (
-    _set_headers,
+    set_headers,
     extrapolate_user_id_from_session,
     verify_session
 )
@@ -61,7 +61,7 @@ def handle_get_all_bookings(handler):
         })
 
     response_data = json.dumps(results).encode("utf-8")
-    _set_headers(handler, 200, response_data)
+    set_headers(handler, 200, response_data)
     handler.wfile.write(response_data)
     
 def handle_get_booking_by_id(handler, booking_id):
@@ -70,7 +70,7 @@ def handle_get_booking_by_id(handler, booking_id):
         booking_id = int(booking_id)
     except ValueError:
         error_response = json.dumps({"error": "Invalid ID"}).encode("utf-8")
-        _set_headers(handler, 400, error_response)
+        set_headers(handler, 400, error_response)
         handler.wfile.write(error_response)
         return
 
@@ -102,11 +102,11 @@ def handle_get_booking_by_id(handler, booking_id):
             "total_price": row["total_price"]
         }
         response_data = json.dumps(result).encode("utf-8")
-        _set_headers(handler, 200, response_data)
+        set_headers(handler, 200, response_data)
         handler.wfile.write(response_data)
     else:
         error_response = json.dumps({"error": "Booking not found"}).encode("utf-8")
-        _set_headers(handler, 404, error_response)
+        set_headers(handler, 404, error_response)
         handler.wfile.write(error_response)
 
 
@@ -115,7 +115,7 @@ def handle_get_booking_by_id(handler, booking_id):
         booking_id = int(booking_id)
     except ValueError:
         error_response = json.dumps({"error": "Invalid ID"}).encode("utf-8")
-        _set_headers(handler, 400, error_response)
+        set_headers(handler, 400, error_response)
         handler.wfile.write(error_response)
         return
     
@@ -144,11 +144,11 @@ def handle_get_booking_by_id(handler, booking_id):
             "total_price": row["total_price"]
         }
         response_data = json.dumps(result).encode("utf-8")
-        _set_headers(handler, 200, response_data)
+        set_headers(handler, 200, response_data)
         handler.wfile.write(response_data)
     else:
         error_response = json.dumps({"error": "Booking not found"}).encode("utf-8")
-        _set_headers(handler, 404, error_response)
+        set_headers(handler, 404, error_response)
         handler.wfile.write(error_response)
 
 
@@ -206,7 +206,7 @@ def handle_create_booking(handler):
         "status": status,
     }
     response_data = json.dumps(new_booking).encode("utf-8")
-    _set_headers(handler, 201, response_data)
+    set_headers(handler, 201, response_data)
     handler.wfile.write(response_data)
     
 def _validate_booking_data(data):
@@ -285,7 +285,7 @@ def _save_booking(user_id, service_id, start_date, end_date, capacity_requested,
 def _send_error(handler, code, message):
     """Invia un errore al client."""
     error_response = json.dumps({"errore": message}).encode("utf-8")
-    _set_headers(handler, code, error_response)
+    set_headers(handler, code, error_response)
     handler.wfile.write(error_response)
 def handle_update_booking(handler, booking_id):
     """
@@ -297,7 +297,7 @@ def handle_update_booking(handler, booking_id):
         booking_id = int(booking_id)
     except ValueError:
         error_response = json.dumps({"error": "ID non valido"}).encode("utf-8")
-        _set_headers(handler, 400, error_response)
+        set_headers(handler, 400, error_response)
         handler.wfile.write(error_response)
         return
 
@@ -309,7 +309,7 @@ def handle_update_booking(handler, booking_id):
         data = json.loads(body)
     except json.JSONDecodeError:
         error_response = json.dumps({"error": "JSON non valido"}).encode("utf-8")
-        _set_headers(handler, 400, error_response)
+        set_headers(handler, 400, error_response)
         handler.wfile.write(error_response)
         return
 
@@ -330,7 +330,7 @@ def handle_update_booking(handler, booking_id):
 
         if not row:
             error_response = json.dumps({"error": "Prenotazione non trovata"}).encode("utf-8")
-            _set_headers(handler, 404, error_response)
+            set_headers(handler, 404, error_response)
             handler.wfile.write(error_response)
             return
 
@@ -347,7 +347,7 @@ def handle_update_booking(handler, booking_id):
 
         if not service:
             error_response = json.dumps({"error": "Servizio non trovato"}).encode("utf-8")
-            _set_headers(handler, 404, error_response)
+            set_headers(handler, 404, error_response)
             handler.wfile.write(error_response)
             return
 
@@ -357,14 +357,14 @@ def handle_update_booking(handler, booking_id):
             end_date_obj = datetime.strptime(updated_end_date, "%Y-%m-%d").date()
         except ValueError:
             error_response = json.dumps({"error": "Formato della data non valido"}).encode("utf-8")
-            _set_headers(handler, 400, error_response)
+            set_headers(handler, 400, error_response)
             handler.wfile.write(error_response)
             return
 
         num_days = (end_date_obj - start_date_obj).days
         if num_days <= 0:
             error_response = json.dumps({"error": "La data di fine deve essere successiva alla data di inizio"}).encode("utf-8")
-            _set_headers(handler, 400, error_response)
+            set_headers(handler, 400, error_response)
             handler.wfile.write(error_response)
             return
 
@@ -387,7 +387,7 @@ def handle_update_booking(handler, booking_id):
         "status": updated_status,
         "total_price": total_price
     }
-    _set_headers(handler, 200, json.dumps(response_data).encode("utf-8"))
+    set_headers(handler, 200, json.dumps(response_data).encode("utf-8"))
     handler.wfile.write(json.dumps(response_data).encode("utf-8"))
 
 def handle_delete_booking(handler, booking_id):
@@ -399,7 +399,7 @@ def handle_delete_booking(handler, booking_id):
         booking_id = int(booking_id)
     except ValueError:
         error_response = json.dumps({"errore": "ID prenotazione non valido"}).encode("utf-8")
-        _set_headers(handler, 400, error_response)
+        set_headers(handler, 400, error_response)
         handler.wfile.write(error_response)
         return
 
@@ -407,7 +407,7 @@ def handle_delete_booking(handler, booking_id):
     session_id = get_session_id(handler)
     if not session_id:
         error_response = json.dumps({"errore": "Sessione non valida o non fornita"}).encode("utf-8")
-        _set_headers(handler, 401, error_response)
+        set_headers(handler, 401, error_response)
         handler.wfile.write(error_response)
         return
 
@@ -415,7 +415,7 @@ def handle_delete_booking(handler, booking_id):
     user_id = get_user_id_from_session(session_id)
     if not user_id:
         error_response = json.dumps({"errore": "Sessione scaduta o non valida"}).encode("utf-8")
-        _set_headers(handler, 401, error_response)
+        set_headers(handler, 401, error_response)
         handler.wfile.write(error_response)
         return
 
@@ -431,13 +431,13 @@ def handle_delete_booking(handler, booking_id):
 
         if not booking:
             error_response = json.dumps({"errore": "Prenotazione non trovata"}).encode("utf-8")
-            _set_headers(handler, 404, error_response)
+            set_headers(handler, 404, error_response)
             handler.wfile.write(error_response)
             return
 
         if booking["user_id"] != user_id and role != "admin":
             error_response = json.dumps({"errore": "Accesso negato alla prenotazione"}).encode("utf-8")
-            _set_headers(handler, 403, error_response)
+            set_headers(handler, 403, error_response)
             handler.wfile.write(error_response)
             return
 
@@ -446,5 +446,5 @@ def handle_delete_booking(handler, booking_id):
         conn.commit()
 
     success_response = {"messaggio": f"Prenotazione {booking_id} eliminata con successo"}
-    _set_headers(handler, 200, json.dumps(success_response).encode("utf-8"))
+    set_headers(handler, 200, json.dumps(success_response).encode("utf-8"))
     handler.wfile.write(json.dumps(success_response).encode("utf-8"))

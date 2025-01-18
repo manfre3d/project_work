@@ -4,7 +4,8 @@ import bcrypt
 DATABASE_NAME = "database.db"
 
 def get_connection():
-    """Ritorna una connessione SQLite al file database.db con Row factory."""
+    """Ritorna una connessione SQLite al file database.
+    db con Row factory."""
     connection = sqlite3.connect(DATABASE_NAME)
     connection.row_factory = sqlite3.Row  
     connection.execute("PRAGMA foreign_keys = ON;")

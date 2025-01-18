@@ -1,7 +1,7 @@
 import json
 from db import get_connection
 from authentication import verify_authentication
-from utility.utility import _set_headers
+from utility.utility import set_headers
 from user_routes import authenticate
 
 
@@ -30,7 +30,7 @@ def handle_get_all_services(handler):
         })
 
     response_data = json.dumps(results).encode("utf-8")
-    _set_headers(handler, 200, response_data)
+    set_headers(handler, 200, response_data)
     handler.wfile.write(response_data)
 
 
@@ -42,7 +42,7 @@ def handle_get_service_by_id(handler, service_id):
         service_id = int(service_id)
     except ValueError:
         error_response = json.dumps({"error": "Invalid ID"}).encode("utf-8")
-        _set_headers(handler, 400, error_response)
+        set_headers(handler, 400, error_response)
         handler.wfile.write(error_response)
         return
 
@@ -65,11 +65,11 @@ def handle_get_service_by_id(handler, service_id):
             "active": bool(row[5])
         }
         response_data = json.dumps(result).encode("utf-8")
-        _set_headers(handler, 200, response_data)
+        set_headers(handler, 200, response_data)
         handler.wfile.write(response_data)
     else:
         error_response = json.dumps({"error": "Service not found"}).encode("utf-8")
-        _set_headers(handler, 404, error_response)
+        set_headers(handler, 404, error_response)
         handler.wfile.write(error_response)
 
 
@@ -85,7 +85,7 @@ def handle_create_service(handler):
         data = json.loads(body)
     except json.JSONDecodeError:
         error_response = json.dumps({"error": "Invalid JSON"}).encode("utf-8")
-        _set_headers(handler, 400, error_response)
+        set_headers(handler, 400, error_response)
         handler.wfile.write(error_response)
         return
 
@@ -116,7 +116,7 @@ def handle_create_service(handler):
     }
     response_data = json.dumps(new_service).encode("utf-8")
 
-    _set_headers(handler, 201, response_data)
+    set_headers(handler, 201, response_data)
     handler.wfile.write(response_data)
 
 
@@ -128,7 +128,7 @@ def handle_update_service(handler, service_id):
         service_id = int(service_id)
     except ValueError:
         error_response = json.dumps({"error": "Invalid ID"}).encode("utf-8")
-        _set_headers(handler, 400, error_response)
+        set_headers(handler, 400, error_response)
         handler.wfile.write(error_response)
         return
 
@@ -139,7 +139,7 @@ def handle_update_service(handler, service_id):
         data = json.loads(body)
     except json.JSONDecodeError:
         error_response = json.dumps({"error": "Invalid JSON"}).encode("utf-8")
-        _set_headers(handler, 400, error_response)
+        set_headers(handler, 400, error_response)
         handler.wfile.write(error_response)
         return
 
@@ -160,7 +160,7 @@ def handle_update_service(handler, service_id):
         row = c.fetchone()
         if not row:
             error_response = json.dumps({"error": "Service not found"}).encode("utf-8")
-            _set_headers(handler, 404, error_response)
+            set_headers(handler, 404, error_response)
             handler.wfile.write(error_response)
             return
 
@@ -188,7 +188,7 @@ def handle_update_service(handler, service_id):
         "active": bool(updated_active)
     }
     response_data = json.dumps(updated_service).encode("utf-8")
-    _set_headers(handler, 200, response_data)
+    set_headers(handler, 200, response_data)
     handler.wfile.write(response_data)
 
 
@@ -200,7 +200,7 @@ def handle_delete_service(handler, service_id):
         service_id = int(service_id)
     except ValueError:
         error_response = json.dumps({"error": "Invalid ID"}).encode("utf-8")
-        _set_headers(handler, 400, error_response)
+        set_headers(handler, 400, error_response)
         handler.wfile.write(error_response)
         return
 
@@ -211,7 +211,7 @@ def handle_delete_service(handler, service_id):
         row = c.fetchone()
         if not row:
             error_response = json.dumps({"error": "Service not found"}).encode("utf-8")
-            _set_headers(handler, 404, error_response)
+            set_headers(handler, 404, error_response)
             handler.wfile.write(error_response)
             return
 
@@ -220,6 +220,6 @@ def handle_delete_service(handler, service_id):
         conn.commit()
 
     response_data = json.dumps({"message": f"Service {service_id} deleted"}).encode("utf-8")
-    _set_headers(handler, 200, response_data)
+    set_headers(handler, 200, response_data)
     handler.wfile.write(response_data)
 

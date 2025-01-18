@@ -2,14 +2,22 @@ import json
 from urllib.parse import urlparse, parse_qs
 from utility.session import get_session_id, get_user_id_from_session
 
-def _set_headers(handler, code=200, response_data=b'', content_type="application/json", extra_headers=None, origin="http://localhost:8000"):
+def set_headers(
+    handler, code=200,
+    response_data=b'',
+    content_type="application/json",
+    extra_headers=None, 
+    origin="http://localhost:8000"):
     handler.send_response(code)
     handler.send_header("Access-Control-Allow-Origin", origin)
     handler.send_header("Content-Type", content_type)
     handler.send_header("Accept", content_type)
-    handler.send_header("Access-Control-Allow-Credentials", "true")
-    handler.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-    handler.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+    handler.send_header("Access-Control-Allow-Credentials", 
+                        "true")
+    handler.send_header("Access-Control-Allow-Methods",
+                        "GET, POST, PUT, DELETE, OPTIONS")
+    handler.send_header("Access-Control-Allow-Headers",
+                        "Content-Type, Authorization")
     if extra_headers:
         for header, value in extra_headers.items():
             handler.send_header(header, value)
@@ -48,7 +56,7 @@ def verify_session(handler):
     session_id = get_session_id(handler)
     if not session_id:
         error_response = json.dumps({"error": "Sessione non valida o non fornita"}).encode("utf-8")
-        _set_headers(handler, 401, error_response)
+        set_headers(handler, 401, error_response)
         handler.wfile.write(error_response)
         return
 
@@ -56,7 +64,7 @@ def verify_session(handler):
     user_id = get_user_id_from_session(session_id)
     if not user_id:
         error_response = json.dumps({"error": "Sessione scaduta o non valida"}).encode("utf-8")
-        _set_headers(handler, 401, error_response)
+        set_headers(handler, 401, error_response)
         handler.wfile.write(error_response)
         return
 

@@ -4,12 +4,12 @@ import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from routes import route_request
 from db import init_db
-from utility.utility import _set_headers
+from utility.utility import set_headers
 from socketserver import ThreadingMixIn
 
 class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
     """Server HTTP che supporta il multi-threading."""
-    # quando il server è terminato chiude i socket e i file descriptor
+    # quando il server è terminato chiude i thread 
     daemon_threads = True
 class MyHandler(BaseHTTPRequestHandler):
     server_version = "CustomHTTPServer"
@@ -17,8 +17,9 @@ class MyHandler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
     def do_OPTIONS(self):
-        """Gestisce le richieste OPTIONS. Utilizzato per la preflight CORS."""
-        _set_headers(self, 200)
+        """Gestisce le richieste OPTIONS. 
+        Utilizzato per la preflight CORS."""
+        set_headers(self, 200)
 
     def do_GET(self):
         """Gestisce le richieste GET."""
@@ -27,6 +28,9 @@ class MyHandler(BaseHTTPRequestHandler):
             self.serve_static_file()
         else:
             # gestione di richieste API
+            # The `route_request` function is responsible for handling API requests based on the HTTP
+            # method (GET, POST, PUT, DELETE). It is called from the `do_GET`, `do_POST`, `do_PUT`,
+            # and `do_DELETE` methods in the `MyHandler` class.
             route_request(self, "GET")
 
     def serve_static_file(self):
@@ -54,20 +58,20 @@ class MyHandler(BaseHTTPRequestHandler):
 
                 content_type = self._get_content_type(file_path)
                 
-                _set_headers(self, 200, file_content, content_type)
+                set_headers(self, 200, file_content, content_type)
                 self.wfile.write(file_content)
                 
                 print(f"Servito file statico: {file_path}")
             except Exception as e:
                 print(f"Errore durante il caricamento del file statico: {e}")
                 error_response = json.dumps({"error": "Errore interno del server"}).encode("utf-8")
-                _set_headers(self, 500, error_response )
+                set_headers(self, 500, error_response )
                 self.wfile.write(error_response)
         else:
             print(f"File non trovato: {file_path}")
             error_response = json.dumps({"error": "File non trovato"}).encode("utf-8")
-            _set_headers(self, 404, error_response )
-            # todo: inserire nel metodo _set_headers self.wfile.write(***) visto che passo il parametro response_data
+            set_headers(self, 404, error_response )
+            # todo: inserire nel metodo set_headers self.wfile.write(***) visto che passo il parametro response_data
             self.wfile.write(error_response)
 
     def _serve_file(self, file_path):
@@ -76,7 +80,7 @@ class MyHandler(BaseHTTPRequestHandler):
             file_content = f.read()
 
         content_type = self._get_content_type(file_path)
-        _set_headers(self, 200, file_content,content_type)
+        set_headers(self, 200, file_content,content_type)
         self.wfile.write(file_content);
         print(f"File statico servito: {file_path}")
 

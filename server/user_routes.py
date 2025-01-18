@@ -2,7 +2,7 @@ import json
 import sqlite3
 from db import get_connection
 from authentication import authenticate
-from utility.utility import _set_headers
+from utility.utility import set_headers
 from utility.session import create_session, delete_session
 
 import bcrypt
@@ -24,7 +24,7 @@ def handle_login(handler):
     except (ValueError, KeyError, json.JSONDecodeError):
         print("Errore nel parsing della richiesta di login")
         error_bytes = json.dumps({"error": "JSON non valido o campi mancanti"}).encode("utf-8")
-        _set_headers(handler, 400, error_bytes)
+        set_headers(handler, 400, error_bytes)
         handler.wfile.write(error_bytes)
         return
 
@@ -41,7 +41,7 @@ def handle_login(handler):
     if row is None:
         print(f"Utente non trovato: {username}")
         error_response = json.dumps({"error": "Utente inesistente"}).encode("utf-8")
-        _set_headers(handler, 401, error_response)
+        set_headers(handler, 401, error_response)
         handler.wfile.write(error_response)
         return
 
@@ -73,12 +73,12 @@ def handle_login(handler):
         }
         
         #tramite metodo set headers impostiamo header extra necessari per passare il session_id al fe
-        _set_headers(handler, 200, response_data, extra_headers=extra_headers)
+        set_headers(handler, 200, response_data, extra_headers=extra_headers)
         handler.wfile.write(response_data)
     else:
         print(f"Password errata per l'utente: {username}")
         error_response = json.dumps({"error": "Username o password errati"}).encode("utf-8")
-        _set_headers(handler, 401, error_response)
+        set_headers(handler, 401, error_response)
         handler.wfile.write(error_response)
 
 def handle_logout(handler):
@@ -86,7 +86,7 @@ def handle_logout(handler):
     cookies = handler.headers.get("Cookie")
     if not cookies:
         error_response = json.dumps({"error": "Nessuna sessione attiva"}).encode("utf-8")
-        _set_headers(handler, 400, error_response)
+        set_headers(handler, 400, error_response)
         handler.wfile.write(error_response)
         return
 
@@ -98,7 +98,7 @@ def handle_logout(handler):
 
     if not session_id:
         error_response = json.dumps({"error": "Nessuna sessione attiva"}).encode("utf-8")
-        _set_headers(handler, 400, error_response)
+        set_headers(handler, 400, error_response)
         handler.wfile.write(error_response)
         return
 
@@ -109,7 +109,7 @@ def handle_logout(handler):
     extra_headers = {
         "Set-Cookie": "session_id=; HttpOnly; Path=/; Max-Age=0"
     }
-    _set_headers(
+    set_headers(
         handler,
         code=200,
         response_data=response_data,
@@ -124,7 +124,7 @@ def handle_get_all_users(handler):
     # di vedere tutti gli utenti
     if authenticated_user["role"] != "admin":
         error_response = json.dumps({"error": "Autorizzazione richiesta"}).encode("utf-8")
-        _set_headers(handler, 403, error_response)
+        set_headers(handler, 403, error_response)
         handler.wfile.write(error_response)
         return
 
@@ -144,7 +144,7 @@ def handle_get_all_users(handler):
 
     response_data = json.dumps(results).encode("utf-8")
 
-    _set_headers(handler, 200, response_data)
+    set_headers(handler, 200, response_data)
     handler.wfile.write(response_data)
 
 
@@ -154,7 +154,7 @@ def handle_get_user_by_id(handler, user_id):
         user_id = int(user_id)
     except ValueError:
         error_response = json.dumps({"error": "ID non valido"}).encode("utf-8")
-        _set_headers(handler, 400, error_response)
+        set_headers(handler, 400, error_response)
         handler.wfile.write(error_response)
         return
     
@@ -172,11 +172,11 @@ def handle_get_user_by_id(handler, user_id):
         }
         response_data = json.dumps(result).encode("utf-8")
 
-        _set_headers(handler, 200, response_data)
+        set_headers(handler, 200, response_data)
         handler.wfile.write(response_data)
     else:
         error_response = json.dumps({"error": "User non trovato"}).encode("utf-8")
-        _set_headers(handler, 404, error_response)
+        set_headers(handler, 404, error_response)
         handler.wfile.write(error_response)
     
 def handle_get_current_user(handler):
@@ -188,7 +188,7 @@ def handle_get_current_user(handler):
     
     if not session_id:
         error_response = json.dumps({"error": "Sessione non trovata"}).encode("utf-8")
-        _set_headers(handler, 401, error_response)
+        set_headers(handler, 401, error_response)
         print("sessione non valida")
         
         handler.wfile.write(error_response)
@@ -213,13 +213,13 @@ def handle_get_current_user(handler):
         }
         response_data = json.dumps(response).encode("utf-8")
         print(response_data)
-        _set_headers(handler, 200, response_data)
+        set_headers(handler, 200, response_data)
         handler.wfile.write(response_data)
     else:
         error_response = json.dumps({"error": "Sessione non valida"}).encode("utf-8")
         print("sessione non valida")
         
-        _set_headers(handler, 401, error_response)
+        set_headers(handler, 401, error_response)
         handler.wfile.write(error_response)
         
         
@@ -232,7 +232,7 @@ def handle_create_user(handler):
         data = json.loads(body)
     except json.JSONDecodeError:
         error_response = json.dumps({"error": "JSON non valido"}).encode("utf-8")
-        _set_headers(handler, 400, error_response)
+        set_headers(handler, 400, error_response)
         handler.wfile.write(error_response)
         return
 
@@ -245,14 +245,14 @@ def handle_create_user(handler):
     # validazione campi
     if not username or not password or not email:
         error_response = json.dumps({"error": "Tutti i campi sono obbligatori"}).encode("utf-8")
-        _set_headers(handler, 400, error_response)
+        set_headers(handler, 400, error_response)
         handler.wfile.write(error_response)
         return
 
     # validazione formato della email
     if "@" not in email or "." not in email or email.index("@") > email.rindex("."):
         error_response = json.dumps({"error": "Email non valida"}).encode("utf-8")
-        _set_headers(handler, 400, error_response)
+        set_headers(handler, 400, error_response)
         handler.wfile.write(error_response)
         return
 
@@ -271,7 +271,7 @@ def handle_create_user(handler):
         except sqlite3.IntegrityError as e:
             # error per gestire violazioni UNIQUE su username o email
             error_response = json.dumps({"error": f"Violazione di unicità: {str(e)}"}).encode("utf-8")
-            _set_headers(handler, 400, error_response)
+            set_headers(handler, 400, error_response)
             handler.wfile.write(error_response)
             return
     
@@ -282,7 +282,7 @@ def handle_create_user(handler):
     }
     response_data = json.dumps(new_user).encode("utf-8")
 
-    _set_headers(handler, 201, response_data)
+    set_headers(handler, 201, response_data)
     handler.wfile.write(response_data)
 
 def handle_update_user(handler, user_id):
@@ -291,7 +291,7 @@ def handle_update_user(handler, user_id):
         user_id = int(user_id)
     except ValueError:
         error_response = json.dumps({"error": "ID non valido"}).encode("utf-8")
-        _set_headers(handler, 400, error_response)
+        set_headers(handler, 400, error_response)
         handler.wfile.write(error_response)
         return
     
@@ -302,7 +302,7 @@ def handle_update_user(handler, user_id):
         data = json.loads(body)
     except json.JSONDecodeError:
         error_response = json.dumps({"error": "JSON non valido"}).encode("utf-8")
-        _set_headers(handler, 400, error_response)
+        set_headers(handler, 400, error_response)
         handler.wfile.write(error_response)
         return
 
@@ -319,7 +319,7 @@ def handle_update_user(handler, user_id):
         row = c.fetchone()
         if not row:
             error_response = json.dumps({"error": "Utente non trovato"}).encode("utf-8")
-            _set_headers(handler, 404, error_response)
+            set_headers(handler, 404, error_response)
             handler.wfile.write(error_response)
             return
 
@@ -347,7 +347,7 @@ def handle_update_user(handler, user_id):
         except sqlite3.IntegrityError as e:
             # gestiamo errori per violazioni di tipo UNIQUE su username o email
             error_response = json.dumps({"error": f"Violazione di unicità: {str(e)}"}).encode("utf-8")
-            _set_headers(handler, 400, error_response)
+            set_headers(handler, 400, error_response)
             handler.wfile.write(error_response)
             return
 
@@ -359,7 +359,7 @@ def handle_update_user(handler, user_id):
         # "password": hashed_pw 
     }
     response_data = json.dumps(updated_user).encode("utf-8")
-    _set_headers(handler, 200, response_data)
+    set_headers(handler, 200, response_data)
     handler.wfile.write(response_data)
 
 def handle_delete_user(handler, user_id):
@@ -368,7 +368,7 @@ def handle_delete_user(handler, user_id):
         user_id = int(user_id)
     except ValueError:
         error_response = json.dumps({"error": "Invalid ID"}).encode("utf-8")
-        _set_headers(handler, 400, error_response)
+        set_headers(handler, 400, error_response)
         handler.wfile.write(error_response)
         return
 
@@ -379,12 +379,12 @@ def handle_delete_user(handler, user_id):
         row = c.fetchone()
         if not row:
             error_response = json.dumps({"error": "User not found"}).encode("utf-8")
-            _set_headers(handler, 404, error_response)
+            set_headers(handler, 404, error_response)
             handler.wfile.write(error_response)
             return
 
         c.execute("DELETE FROM users WHERE id = ?", (user_id,))
         conn.commit()
     response_data = json.dumps({"message": f"User {user_id} deleted"}).encode("utf-8")
-    _set_headers(handler, 200, response_data)
+    set_headers(handler, 200, response_data)
     handler.wfile.write(response_data)
