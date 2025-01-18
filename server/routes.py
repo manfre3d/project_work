@@ -36,7 +36,6 @@ def route_request(handler, method):
 
     # logica per analizzare il percorso della richiesta
     resource, resource_id = parse_path(handler.path)
-    query_params = parse_query(handler.path)
 
     if (resource, method) not in public_routes:
         authenticated_user = verify_authentication(handler)

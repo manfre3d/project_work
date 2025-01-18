@@ -75,7 +75,7 @@ class MyHandler(BaseHTTPRequestHandler):
         print(f"File statico servito: {file_path}")
 
     def _get_content_type(self, file_path):
-        """Determina il Content-Type in base all'estensione del file."""
+        """restituisce in base all'estensione del file il Content-Type."""
         if file_path.endswith(".html"):
             return "text/html"
         elif file_path.endswith(".css"):
