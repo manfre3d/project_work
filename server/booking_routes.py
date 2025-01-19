@@ -1,12 +1,8 @@
 import json
 import sqlite3
 from db import get_connection
-from utility.authentication import authenticate
-from utility.session import get_session_id, get_user_id_from_session
 from utility.utility import (
-    set_headers,
-    extrapolate_user_id_from_session,
-    verify_session
+    set_headers
 )
 from datetime import datetime
 
@@ -194,29 +190,38 @@ def _validate_booking_data(data):
 
 
 def _get_service_capacity(service_id):
-    """Recupera la capacità del servizio dal database."""
+    """Recupera la disponibilita'/capacita' del servizio dal database."""
     with get_connection() as conn:
         c = conn.cursor()
         c.execute("SELECT capacity FROM services WHERE id = ?", (service_id,))
         service_row = c.fetchone()
         return service_row["capacity"] if service_row else None
 
-
-def _check_availability(service_id, start_date, end_date, capacity_requested, service_capacity):
-    """Verifica la disponibilità del servizio per il periodo selezionato."""
+def _check_availability(service_id, start_date, end_date, capacity_requested, service_capacity, exclude_booking_id=None):
+    """Verifica la disponibilità del servizio per il periodo selezionato, escludendo una prenotazione specifica se necessario."""
     with get_connection() as conn:
         c = conn.cursor()
-        c.execute("""
+
+        query = """
             SELECT SUM(capacity_requested) as total_booked
             FROM bookings
             WHERE service_id = ? AND (
                 (start_date <= ? AND end_date > ?) OR
                 (start_date < ? AND end_date >= ?)
             )
-        """, (service_id, end_date, start_date, end_date, start_date))
-        total_booked = c.fetchone()["total_booked"] or 0
-        return total_booked + capacity_requested <= service_capacity
+        """
+        params = [service_id, end_date, start_date, end_date, start_date]
 
+        # viene aggiunta la verifica per escludere una prenotazione specifica
+        # se exclude_booking_id è valorizzato
+        if exclude_booking_id is not None:
+            query += " AND id != ?"
+            params.append(exclude_booking_id)
+
+        c.execute(query, params)
+        total_booked = c.fetchone()["total_booked"] or 0
+
+    return total_booked + capacity_requested <= service_capacity
 
 def _save_booking(user_id, service_id, start_date, end_date, capacity_requested, status):
     """Salva la prenotazione nel database e restituisce l'ID della nuova prenotazione."""
@@ -238,7 +243,7 @@ def _save_booking(user_id, service_id, start_date, end_date, capacity_requested,
                 INSERT INTO bookings (user_id, service_id, start_date, end_date, capacity_requested, status, total_price)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             """, (user_id, service_id, start_date.strftime("%Y-%m-%d"),
-                  end_date.strftime("%Y-%m-%d"), capacity_requested, status, total_price))
+                end_date.strftime("%Y-%m-%d"), capacity_requested, status, total_price))
             conn.commit()
             return c.lastrowid
     except sqlite3.IntegrityError:
@@ -252,101 +257,105 @@ def _send_error(handler, code, message):
     handler.wfile.write(error_response)
 def handle_update_booking(handler, authenticated_user, booking_id):
     """
-    PUT /bookings/<id> - Aggiorna la prenotazione esistente.
+    PUT /bookings/<id> - Aggiorna una prenotazione esistente per id.
     """
     user_id = authenticated_user["id"]
-    
+    role = authenticated_user["role"]
+
     try:
         booking_id = int(booking_id)
     except ValueError:
-        error_response = json.dumps({"error": "ID non valido"}).encode("utf-8")
-        set_headers(handler, 400, error_response)
-        handler.wfile.write(error_response)
+        _send_error(handler, 400, "ID non valido")
         return
 
-    
     content_length = int(handler.headers.get("Content-Length", 0))
     body = handler.rfile.read(content_length).decode("utf-8")
 
     try:
         data = json.loads(body)
     except json.JSONDecodeError:
-        error_response = json.dumps({"error": "JSON non valido"}).encode("utf-8")
-        set_headers(handler, 400, error_response)
-        handler.wfile.write(error_response)
+        _send_error(handler, 400, "JSON non valido")
         return
-
-    user_id = data.get("user_id") if data.get("user_id") else user_id
-    service_id = data.get("service_id")
-    start_date = data.get("start_date")
-    end_date = data.get("end_date")
-    status = data.get("status")
 
     with get_connection() as conn:
         c = conn.cursor()
-        
-        
-        c.execute("""
-            SELECT * FROM bookings WHERE id = ? AND user_id = ?
-        """, (booking_id, user_id))
-        row = c.fetchone()
+        c.execute("SELECT * FROM bookings WHERE id = ?", (booking_id,))
+        existing_booking = c.fetchone()
 
-        if not row:
-            error_response = json.dumps({"error": "Prenotazione non trovata"}).encode("utf-8")
-            set_headers(handler, 404, error_response)
-            handler.wfile.write(error_response)
-            return
+    if not existing_booking:
+        _send_error(handler, 404, "Prenotazione non trovata")
+        return
 
-        updated_service_id = service_id or row["service_id"]
-        updated_start_date = start_date or row["start_date"]
-        updated_end_date = end_date or row["end_date"]
-        updated_status = status or row["status"]
+    # controllo sul ruolo dell'utente per vedere se può modificare la prenotazione 
+    # se è un admin può modificare tutte le prenotazioni, altrimenti solo le sue
+    
+    if existing_booking["user_id"] != user_id and role != "admin":
+        _send_error(handler, 403, "Accesso negato alla prenotazione")
+        return
 
-        
-        c.execute("""
-            SELECT price FROM services WHERE id = ?
-        """, (updated_service_id,))
+    # aggiorna o mantieni i dati
+    updated_service_id = data.get("service_id", existing_booking["service_id"])
+    updated_start_date = data.get("start_date", existing_booking["start_date"])
+    updated_end_date = data.get("end_date", existing_booking["end_date"])
+    updated_capacity_requested = data.get("capacity_requested", existing_booking["capacity_requested"])
+    updated_status = data.get("status", existing_booking["status"])
+
+    validation_result = _validate_booking_data({
+        "service_id": updated_service_id,
+        "start_date": updated_start_date,
+        "end_date": updated_end_date
+    })
+    if validation_result.get("error"):
+        _send_error(handler, 400, validation_result["error"])
+        return
+
+    start_date = validation_result["start_date"]
+    end_date = validation_result["end_date"]
+    
+    service_capacity = _get_service_capacity(updated_service_id)
+    if service_capacity is None:
+        _send_error(handler, 404, "Servizio non trovato")
+        return
+
+    if not _check_availability(
+        updated_service_id,
+        start_date,
+        end_date,
+        updated_capacity_requested,
+        service_capacity,
+        exclude_booking_id=booking_id):
+        _send_error(handler, 400, "Disponibilita' del servizio insufficiente per il periodo selezionato")
+        return
+
+    with get_connection() as conn:
+        c = conn.cursor()
+        c.execute("SELECT price FROM services WHERE id = ?", (updated_service_id,))
         service = c.fetchone()
+    if not service:
+        _send_error(handler, 404, "Servizio non trovato")
+        return
 
-        if not service:
-            error_response = json.dumps({"error": "Servizio non trovato"}).encode("utf-8")
-            set_headers(handler, 404, error_response)
-            handler.wfile.write(error_response)
-            return
+    daily_price = service["price"]
+    num_days = (end_date - start_date).days
+    total_price = daily_price * num_days * updated_capacity_requested
 
-        daily_price = float(service["price"])
-        try:
-            start_date_obj = datetime.strptime(updated_start_date, "%Y-%m-%d").date()
-            end_date_obj = datetime.strptime(updated_end_date, "%Y-%m-%d").date()
-        except ValueError:
-            error_response = json.dumps({"error": "Formato della data non valido"}).encode("utf-8")
-            set_headers(handler, 400, error_response)
-            handler.wfile.write(error_response)
-            return
-
-        num_days = (end_date_obj - start_date_obj).days
-        if num_days <= 0:
-            error_response = json.dumps({"error": "La data di fine deve essere successiva alla data di inizio"}).encode("utf-8")
-            set_headers(handler, 400, error_response)
-            handler.wfile.write(error_response)
-            return
-
-        total_price = daily_price * num_days
-
-        
+    # aggiorna la prenotazione
+    with get_connection() as conn:
+        c = conn.cursor()
         c.execute("""
             UPDATE bookings
-            SET service_id = ?, start_date = ?, end_date = ?, status = ?, total_price = ?
-            WHERE id = ? AND user_id = ?
-        """, (updated_service_id, updated_start_date, updated_end_date, updated_status, total_price, booking_id, user_id))
+            SET service_id = ?, start_date = ?, end_date = ?, capacity_requested = ?, status = ?, total_price = ?
+            WHERE id = ?
+        """, (updated_service_id, start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"),
+            updated_capacity_requested, updated_status, total_price, booking_id))
         conn.commit()
 
-    
     response_data = {
         "id": booking_id,
         "service_id": updated_service_id,
-        "start_date": updated_start_date,
-        "end_date": updated_end_date,
+        "start_date": start_date.strftime("%Y-%m-%d"),
+        "end_date": end_date.strftime("%Y-%m-%d"),
+        "capacity_requested": updated_capacity_requested,
         "status": updated_status,
         "total_price": total_price
     }
