@@ -34,8 +34,8 @@ def seed_services():
 def seed_bookings():
     """Popola la tabella bookings con dati di default."""
     bookings = [
-        {"user_id": 1, "service_id": 1, "start_date": "2025-01-01", "end_date": "2025-01-05", "status": "confirmed", "capacity_requested": 1, "total_price": 200.0},
-        {"user_id": 1, "service_id": 2, "start_date": "2025-02-01", "end_date": "2025-02-03", "status": "pending", "capacity_requested": 2, "total_price": 200.0},
+        {"user_id": 1, "service_id": 1, "start_date": "2025-10-01", "end_date": "2025-11-05", "status": "confirmed", "capacity_requested": 1, "total_price": 200.0},
+        {"user_id": 1, "service_id": 2, "start_date": "2025-10-01", "end_date": "2025-11-03", "status": "pending", "capacity_requested": 2, "total_price": 200.0},
     ]
 
     with get_connection() as conn:
