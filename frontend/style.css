@@ -256,7 +256,7 @@ form button.btn {
   color: #fff;
 }
 
-/* Pulsanti azione nella tabella Admin */
+/* stile generale delle tabelle */
 .btn-admin-table-success {
   width: 100%;
   background-color: #28a745; 
@@ -339,10 +339,14 @@ form button.btn {
 .table-responsive {
   display: block;
   width: 100%;
-  overflow-x: auto;
+  overflow-x:hidden;
 }
-
-@media (max-width: 576px) {
+/* media query per gestire schermi di dimensione ridotta
+  aggisce principalmente sulle tabelle nel flusso per admin
+  poiché il flusso normale utilizza lo stile del framework Bootstrap
+  che è di default responsive
+*/
+@media (max-width: 770px) {
   table.table {
     display: block;
   }
@@ -395,14 +399,6 @@ form button.btn {
   margin: 0; 
 }
 
-/* Media query per schermi piccoli */
-@media (max-width: 576px) {
-  .card-actions {
-    flex-direction: column; 
-  }
 
-  .card-actions button {
-    width: 100%;
-  }
-}
+
 
