@@ -10,12 +10,11 @@ from utility.utility import (
 )
 from datetime import datetime
 
-def handle_get_all_bookings(handler):
+def handle_get_all_bookings(handler, authenticated_user):
     """
     GET /bookings - Ritorna tutte le prenotazioni per admin o solo quelle
     dell'utente corrente se non è un admin.
     """
-    authenticated_user = authenticate(handler)
 
     user_id = authenticated_user["id"]
     role = authenticated_user["role"]
@@ -27,8 +26,8 @@ def handle_get_all_bookings(handler):
             # recupera tutte le prenotazioni presenti per tutti gli utenti se l'utente è un admin
             c.execute("""
                 SELECT b.id, b.user_id, b.service_id, b.start_date, b.end_date, b.status, b.total_price,
-                       s.name AS service_name, s.description AS service_description,
-                       u.username AS user_name
+                    s.name AS service_name, s.description AS service_description,
+                    u.username AS user_name
                 FROM bookings b
                 JOIN services s ON b.service_id = s.id
                 JOIN users u ON b.user_id = u.id
@@ -37,7 +36,7 @@ def handle_get_all_bookings(handler):
             # recupera solo le prenotazioni dell'utente corrente con ruolo user
             c.execute("""
                 SELECT b.id, b.user_id, b.service_id, b.start_date, b.end_date, b.status, b.total_price,
-                       s.name AS service_name, s.description AS service_description
+                    s.name AS service_name, s.description AS service_description
                 FROM bookings b
                 JOIN services s ON b.service_id = s.id
                 WHERE b.user_id = ?
@@ -110,54 +109,13 @@ def handle_get_booking_by_id(handler, booking_id):
         handler.wfile.write(error_response)
 
 
-    """GET /bookings/<id> - Ritorna la singola prenotazione, se esiste."""
-    try:
-        booking_id = int(booking_id)
-    except ValueError:
-        error_response = json.dumps({"error": "Invalid ID"}).encode("utf-8")
-        set_headers(handler, 400, error_response)
-        handler.wfile.write(error_response)
-        return
-    
-    with get_connection() as conn:
-        c = conn.cursor()
-        c.execute("""
-            SELECT 
-                b.id, b.user_id, b.service_id, 
-                b.start_date, b.end_date, b.status, b.total_price,
-                s.name AS service_name
-            FROM bookings b
-            JOIN services s ON b.service_id = s.id
-            WHERE b.id = ?
-        """, (booking_id,))
-        row = c.fetchone()
-
-    if row:
-        result = {
-            "id": row["id"],
-            "user_id": row["user_id"],
-            "service_id": row["service_id"],
-            "start_date": row["start_date"],
-            "end_date": row["end_date"],
-            "status": row["status"],
-            "service_name": row["service_name"],
-            "total_price": row["total_price"]
-        }
-        response_data = json.dumps(result).encode("utf-8")
-        set_headers(handler, 200, response_data)
-        handler.wfile.write(response_data)
-    else:
-        error_response = json.dumps({"error": "Booking not found"}).encode("utf-8")
-        set_headers(handler, 404, error_response)
-        handler.wfile.write(error_response)
-
-
-def handle_create_booking(handler):
+def handle_create_booking(handler, authenticated_user):
     """Handler per POST /bookings - Crea una nuova prenotazione."""
     content_length = int(handler.headers.get("Content-Length", 0))
     body = handler.rfile.read(content_length).decode("utf-8")
 
-    verify_session(handler)
+    
+    user_id = authenticated_user["id"]
     
     
     try:
@@ -172,7 +130,7 @@ def handle_create_booking(handler):
         _send_error(handler, 400, validation_result["error"])
         return
 
-    user_id = data["user_id"] if data.get("user_id") else extrapolate_user_id_from_session(handler)
+    user_id = data["user_id"] if data.get("user_id") else user_id
     service_id = data["service_id"]
     start_date = validation_result["start_date"]
     end_date = validation_result["end_date"]
@@ -222,6 +180,12 @@ def _validate_booking_data(data):
     try:
         start_date = datetime.strptime(data["start_date"], "%Y-%m-%d").date()
         end_date = datetime.strptime(data["end_date"], "%Y-%m-%d").date()
+        
+        today = datetime.now().date()
+        # verifica se la data è precedente a quella odierna
+        if start_date < today:
+            return {"error": "La data di inizio non può essere precedente alla data odierna"}
+        # verifica se la data di inizio è successiva a quella di fine
         if start_date >= end_date:
             return {"error": "La data di inizio deve essere precedente alla data di fine"}
         return {"start_date": start_date, "end_date": end_date}
@@ -260,7 +224,6 @@ def _save_booking(user_id, service_id, start_date, end_date, capacity_requested,
         with get_connection() as conn:
             c = conn.cursor()
             
-            
             c.execute("SELECT price FROM services WHERE id = ?", (service_id,))
             service = c.fetchone()
             if not service:
@@ -284,15 +247,15 @@ def _save_booking(user_id, service_id, start_date, end_date, capacity_requested,
 
 def _send_error(handler, code, message):
     """Invia un errore al client."""
-    error_response = json.dumps({"errore": message}).encode("utf-8")
+    error_response = json.dumps({"error": message}).encode("utf-8")
     set_headers(handler, code, error_response)
     handler.wfile.write(error_response)
-def handle_update_booking(handler, booking_id):
+def handle_update_booking(handler, authenticated_user, booking_id):
     """
     PUT /bookings/<id> - Aggiorna la prenotazione esistente.
     """
-    verify_session(handler)
-
+    user_id = authenticated_user["id"]
+    
     try:
         booking_id = int(booking_id)
     except ValueError:
@@ -313,7 +276,7 @@ def handle_update_booking(handler, booking_id):
         handler.wfile.write(error_response)
         return
 
-    user_id = data.get("user_id") if data.get("user_id") else extrapolate_user_id_from_session(handler)
+    user_id = data.get("user_id") if data.get("user_id") else user_id
     service_id = data.get("service_id")
     start_date = data.get("start_date")
     end_date = data.get("end_date")
@@ -390,34 +353,19 @@ def handle_update_booking(handler, booking_id):
     set_headers(handler, 200, json.dumps(response_data).encode("utf-8"))
     handler.wfile.write(json.dumps(response_data).encode("utf-8"))
 
-def handle_delete_booking(handler, booking_id):
+def handle_delete_booking(handler, authenticated_user, booking_id):
     """DELETE /bookings/<id> - Elimina una prenotazione."""
-    authenticated_user = authenticate(handler)
     
     role = authenticated_user["role"] 
     try:
         booking_id = int(booking_id)
     except ValueError:
-        error_response = json.dumps({"errore": "ID prenotazione non valido"}).encode("utf-8")
+        error_response = json.dumps({"error": "ID prenotazione non valido"}).encode("utf-8")
         set_headers(handler, 400, error_response)
         handler.wfile.write(error_response)
         return
 
-    # recupera il session_id dai cookie
-    session_id = get_session_id(handler)
-    if not session_id:
-        error_response = json.dumps({"errore": "Sessione non valida o non fornita"}).encode("utf-8")
-        set_headers(handler, 401, error_response)
-        handler.wfile.write(error_response)
-        return
-
-    # verifica l'utente associato al session_id
-    user_id = get_user_id_from_session(session_id)
-    if not user_id:
-        error_response = json.dumps({"errore": "Sessione scaduta o non valida"}).encode("utf-8")
-        set_headers(handler, 401, error_response)
-        handler.wfile.write(error_response)
-        return
+    user_id = authenticated_user["id"]
 
     # cerca la prenotazione nel database
     with get_connection() as conn:
@@ -430,13 +378,13 @@ def handle_delete_booking(handler, booking_id):
         booking = c.fetchone()
 
         if not booking:
-            error_response = json.dumps({"errore": "Prenotazione non trovata"}).encode("utf-8")
+            error_response = json.dumps({"error": "Prenotazione non trovata"}).encode("utf-8")
             set_headers(handler, 404, error_response)
             handler.wfile.write(error_response)
             return
 
         if booking["user_id"] != user_id and role != "admin":
-            error_response = json.dumps({"errore": "Accesso negato alla prenotazione"}).encode("utf-8")
+            error_response = json.dumps({"error": "Accesso negato alla prenotazione"}).encode("utf-8")
             set_headers(handler, 403, error_response)
             handler.wfile.write(error_response)
             return

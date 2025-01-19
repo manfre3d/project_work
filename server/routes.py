@@ -48,18 +48,18 @@ def route_request(handler, method):
     if resource == "bookings":
         if resource_id is None:
             if method == "GET":
-                handle_get_all_bookings(handler)
+                handle_get_all_bookings(handler,authenticated_user)
             elif method == "POST":
-                handle_create_booking(handler)
+                handle_create_booking(handler,authenticated_user)
             else:
                 handle_404(handler)
         else:
             if method == "GET":
                 handle_get_booking_by_id(handler, resource_id)
             elif method == "PUT":
-                handle_update_booking(handler, resource_id)
+                handle_update_booking(handler, authenticated_user, resource_id)
             elif method == "DELETE":
-                handle_delete_booking(handler, resource_id)
+                handle_delete_booking(handler, authenticated_user, resource_id)
             else:
                 handle_404(handler)
         return

@@ -60,7 +60,7 @@ async function loadServices() {
 
     if (!response.ok) {
       const errMsg = await response.json();
-      throw new Error(errMsg.errore || "Errore nel caricamento dei servizi");
+      throw new Error(errMsg.error || "Errore nel caricamento dei servizi");
     }
 
     const services = await response.json();
@@ -417,7 +417,7 @@ export function setupBookingHandler() {
 
       if (!response.ok) {
         const errorMsg = await response.json();
-        throw new Error(errorMsg.errore || "Errore nella creazione prenotazione");
+        throw new Error(errorMsg.error || "Errore nella creazione prenotazione");
       }
 
       const created = await response.json();
