@@ -182,7 +182,7 @@ def _validate_booking_data(data):
         if start_date < today:
             return {"error": "La data di inizio non può essere precedente alla data odierna"}
         # verifica se la data di inizio è successiva a quella di fine
-        if start_date >= end_date:
+        if start_date > end_date:
             return {"error": "La data di inizio deve essere precedente alla data di fine"}
         return {"start_date": start_date, "end_date": end_date}
     except ValueError:
@@ -235,7 +235,7 @@ def _save_booking(user_id, service_id, start_date, end_date, capacity_requested,
                 return None
 
             daily_price = service["price"]
-            num_days = (end_date - start_date).days
+            num_days = (end_date - start_date).days + 1
             total_price = daily_price * num_days * capacity_requested
             
             
@@ -336,7 +336,7 @@ def handle_update_booking(handler, authenticated_user, booking_id):
         return
 
     daily_price = service["price"]
-    num_days = (end_date - start_date).days
+    num_days = (end_date - start_date).days + 1
     total_price = daily_price * num_days * updated_capacity_requested
 
     # aggiorna la prenotazione

@@ -42,8 +42,9 @@ export function calculateTotalPrice(startDate, endDate, pricePerDay) {
   const start = new Date(startDate);
   const end = new Date(endDate);
 
-  if (isNaN(start) || isNaN(end)) return 0;
+  // giorni, includendo il giorno iniziale
+  const millisecondsPerDay = 1000 * 60 * 60 * 24;
+  const days = Math.floor((end - start) / millisecondsPerDay) + 1;
 
-  const days = (end - start) / (1000 * 60 * 60 * 24);
   return days > 0 ? days * pricePerDay : 0;
 }
