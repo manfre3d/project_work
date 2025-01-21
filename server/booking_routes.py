@@ -4,10 +4,10 @@ from utility.utility import (
     set_headers
 )
 from utility.booking_utility import (
-    _get_service_capacity,
-    _check_availability,
-    _save_booking,
-    _validate_booking_data,
+    get_service_capacity,
+    check_availability,
+    save_booking,
+    validate_booking_data,
 )
 
 def handle_get_all_bookings(handler, authenticated_user):
@@ -125,7 +125,7 @@ def handle_create_booking(handler, authenticated_user):
         return
 
     # validazione e parsing dati
-    validation_result = _validate_booking_data(data)
+    validation_result = validate_booking_data(data)
     if validation_result.get("error"):
         _send_error(handler, 400, validation_result["error"])
         return
@@ -138,17 +138,17 @@ def handle_create_booking(handler, authenticated_user):
     status = data.get("status", "pending")
 
     # verifica servizio e disponibilità
-    service_capacity = _get_service_capacity(service_id)
+    service_capacity = get_service_capacity(service_id)
     if service_capacity is None:
         _send_error(handler, 404, "Servizio non trovato")
         return
 
-    if not _check_availability(service_id, start_date, end_date, capacity_requested, service_capacity):
+    if not check_availability(service_id, start_date, end_date, capacity_requested, service_capacity):
         _send_error(handler, 400, "Disponibilita' del servizio insufficiente per il periodo selezionato")
         return
 
     # salvataggio prenotazione
-    new_booking_id = _save_booking(user_id, service_id, start_date, end_date, capacity_requested, status)
+    new_booking_id = save_booking(user_id, service_id, start_date, end_date, capacity_requested, status)
     if new_booking_id is None:
         _send_error(handler, 400, "Errore durante il salvataggio della prenotazione")
         return
@@ -217,7 +217,7 @@ def handle_update_booking(handler, authenticated_user, booking_id):
     updated_capacity_requested = data.get("capacity_requested", existing_booking["capacity_requested"])
     updated_status = "pending" if role == "user" else data.get("status", existing_booking["status"])
 
-    validation_result = _validate_booking_data({
+    validation_result = validate_booking_data({
         "service_id": updated_service_id,
         "start_date": updated_start_date,
         "end_date": updated_end_date
@@ -229,12 +229,12 @@ def handle_update_booking(handler, authenticated_user, booking_id):
     start_date = validation_result["start_date"]
     end_date = validation_result["end_date"]
     
-    service_capacity = _get_service_capacity(updated_service_id)
+    service_capacity = get_service_capacity(updated_service_id)
     if service_capacity is None:
         _send_error(handler, 404, "Servizio non trovato")
         return
 
-    if not _check_availability(
+    if not check_availability(
         updated_service_id,
         start_date,
         end_date,

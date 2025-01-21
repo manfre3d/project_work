@@ -3,7 +3,7 @@ from datetime import datetime
 from db import get_connection
 
 
-def _validate_booking_data(data):
+def validate_booking_data(data):
     """valida i dati della prenotazione e converte le date. Non effettua controlli, 
     sull'user_id perché può essere fornito o estratto dalla sessione."""
     required_fields = ["service_id", "start_date", "end_date"]
@@ -29,7 +29,7 @@ def _validate_booking_data(data):
         return {"error": "Formato data non valido. Utilizzare YYYY-MM-DD"}
 
 
-def _get_service_capacity(service_id):
+def get_service_capacity(service_id):
     """Recupera la disponibilita'/capacita' del servizio dal database."""
     with get_connection() as conn:
         c = conn.cursor()
@@ -37,7 +37,7 @@ def _get_service_capacity(service_id):
         service_row = c.fetchone()
         return service_row["capacity"] if service_row else None
 
-def _check_availability(service_id, start_date, end_date, capacity_requested, service_capacity, exclude_booking_id=None):
+def check_availability(service_id, start_date, end_date, capacity_requested, service_capacity, exclude_booking_id=None):
     """Verifica la disponibilità del servizio per il periodo selezionato, escludendo una prenotazione specifica se necessario."""
     with get_connection() as conn:
         c = conn.cursor()
@@ -63,7 +63,7 @@ def _check_availability(service_id, start_date, end_date, capacity_requested, se
 
     return total_booked + capacity_requested <= service_capacity
 
-def _save_booking(user_id, service_id, start_date, end_date, capacity_requested, status):
+def save_booking(user_id, service_id, start_date, end_date, capacity_requested, status):
     """Salva la prenotazione nel database e restituisce l'ID della nuova prenotazione."""
     try:
         with get_connection() as conn:
