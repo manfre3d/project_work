@@ -1,9 +1,6 @@
 import { bookingList, formNewBooking } from "./references.js";
 import { showModal, calculateTotalPrice } from "./utility.js";
-
-// traccia l'id della prenotazione selezionata per modifica/eliminazione
-export let selectedBookingId = null;
-export let selectedUserId = null;
+import { selectedBookingId,selectedUserId, setSelectedUserId, setSelectedBookingId } from "./references.js";
 
 /**
  * aggiorna la lista delle prenotazioni nel DOM.
@@ -99,7 +96,7 @@ async function loadServices() {
  * @param {Event} event - evento click sul pulsante di modifica.
  */
 async function handleEditBooking(event) {
-  selectedBookingId = event.target.dataset.id;
+  setSelectedBookingId(event.target.dataset.id);
 
   // richiama i servizi disponibili, per visualizzarli nella modale di modifica
   await loadServices();
@@ -247,7 +244,7 @@ async function confirmEditBooking() {
       "La prenotazione è stata modificata con successo."
     );
     loadAllBookings();
-    selectedBookingId = null;
+    setSelectedBookingId(null);
   } catch (error) {
     console.error("Errore nella modifica della prenotazione:", error);
     showModal(
@@ -262,7 +259,7 @@ async function confirmEditBooking() {
  * @param {Event} event - evento click sul pulsante di eliminazione.
  */
 async function handleDeleteBooking(event) {
-  selectedBookingId = event.target.dataset.id;
+  setSelectedBookingId(event.target.dataset.id);
   
   const confirmDeleteBtn = document.getElementById("confirmDeleteBtn");
   confirmDeleteBtn.setAttribute("data-context", "user");
@@ -325,7 +322,7 @@ async function confirmDeleteBooking() {
       `La prenotazione con ID=${selectedBookingId} è stata eliminata con successo.`
     );
 
-    selectedBookingId = null;
+    setSelectedBookingId(null);
   } catch (error) {
     console.error("Errore nell'eliminazione della prenotazione:", error);
     showModal(
@@ -561,8 +558,8 @@ function renderAdminBookingList(bookings) {
  * @param {number} bookingId - ID della prenotazione da modificare.
  */
 async function handleAdminEditBooking(bookingId, userId) {
-  selectedBookingId = bookingId;
-  selectedUserId = userId;
+  setSelectedBookingId(bookingId);
+  setSelectedUserId(userId);
   try {
     const response = await fetch(
       `bookings/${bookingId}`,
@@ -616,7 +613,7 @@ async function saveAdminBooking() {
         body: JSON.stringify(updatedBooking),
       }
     );
-    selectedUserId = null;
+    setSelectedUserId(null);
     if (!response.ok) {
       const errMsg = await response.json();
       throw new Error(
@@ -680,7 +677,7 @@ export function attachAdminBookingEventHandlers() {
   document.querySelectorAll(".btn-admin-table-delete").forEach((button) => {
     button.addEventListener("click", async (event) => {
         const bookingId = event.target.getAttribute("data-id");
-        selectedBookingId = bookingId;
+        setSelectedBookingId(bookingId);
     
         const confirmDeleteBtn = document.getElementById("confirmDeleteBtn");
         confirmDeleteBtn.setAttribute("data-context", "admin");

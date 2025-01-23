@@ -11,6 +11,17 @@ export const sectionBookings = document.getElementById("section-bookings");
 export const sectionNewBooking = document.getElementById("section-new-booking");
 export const sectionAdminBooking = document.getElementById("admin-bookings");
 
+// traccia l'id della prenotazione selezionata per modifica/eliminazione
+export let selectedBookingId = null;
+export let selectedUserId = null;
+
+export function setSelectedUserId(id) {
+  selectedUserId = id;
+}
+export function setSelectedBookingId(id) {
+  selectedBookingId = id;
+}
+
 // Altre variabili
 export const loginForm = document.getElementById("login-form");
 export const formNewBooking = document.getElementById("form-new-booking");
@@ -27,6 +38,8 @@ export function setCurrentUserId(id) {
 // Seleziona gli elementi HTML interni alla modale
 export const modalTitleEl = document.getElementById("modalTitle");
 export const modalBodyEl = document.getElementById("modalBody");
+
+
 
 
 
