@@ -1,4 +1,4 @@
-/* styling generale del body */
+/* styling generale del body con regole di reset*/
 body {
   margin: 0;
   font-family: "Roboto", Arial, sans-serif;
@@ -6,14 +6,14 @@ body {
   min-height: 100vh;
 }
 
-/* navbar: branding con un tocco di ombra */
+/* navbar*/
 .navbar-brand {
   font-weight: 600;
   letter-spacing: 0.5px;
   text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.15);
 }
 
-/* navbar: transizione su pulsanti */
+/* navbar transizione */
 .navbar-nav button {
   margin: 0 0.2rem;
   font-weight: 500;
