@@ -48,3 +48,14 @@ export function calculateTotalPrice(startDate, endDate, pricePerDay) {
 
   return days > 0 ? days * pricePerDay : 0;
 }
+
+export function showLoading() {
+  const loadingScreen = document.getElementById("loading-screen");
+  loadingScreen.classList.remove("hidden");
+}
+
+export function hideLoading() {
+  const loadingScreen = document.getElementById("loading-screen");
+  loadingScreen.classList.add("hidden");
+}
+

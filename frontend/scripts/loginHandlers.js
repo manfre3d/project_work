@@ -1,4 +1,4 @@
-import { showModal } from "./utility.js";
+import { showModal,showLoading,hideLoading } from "./utility.js";
 import { showSection } from "./navigationHandlers.js";
 import {
   loginForm,
@@ -16,6 +16,7 @@ export async function initializeApp() {
 
   console.log("Inizializzazione app...");
   try {
+    showLoading();
     const response = await fetch("/current-user", {
       method: "GET",
       credentials: "include",
@@ -40,6 +41,8 @@ export async function initializeApp() {
     }
   } catch (error) {
     console.error("Errore durante il recupero dell'utente:", error);
+  }finally {
+    hideLoading(); 
   }
 }
 
