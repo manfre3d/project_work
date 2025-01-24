@@ -325,6 +325,8 @@
                   >Password:</label
                 >
                 <input
+                  pattern="(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}" 
+                  title="Deve contenere almeno un numero una lettera maiuscola e una lettera minuscola e deve essere lunga almeno 8 caratteri o più" required
                   type="password"
                   id="registerPassword"
                   class="form-control"
