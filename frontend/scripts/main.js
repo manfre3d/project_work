@@ -1,13 +1,15 @@
 import { setupNavHandlers, showSection } from "./navigationHandlers.js";
 import {
-  initializeApp,
+  checkLoggedUserOnInit,
   setupLoginHandler,
   setupRegisterHandler,
   setupLogoutHandler,
 } from "./loginHandlers.js";
-import { setupBookingHandler } from "./bookingHandlers.js";
+import { setupBookingHandler } from "./booking/bookingHandlers.js";
 import { sectionLogin } from "./references.js";
-
+/**
+  * funzione di inizializzazione dell'applicazione
+ */
 function init() {
   // collega i pulsanti della navigazione ai gestori
   setupNavHandlers();
@@ -28,9 +30,9 @@ function init() {
   showSection(sectionLogin);
   
   // inizializza l'applicazione verificando se è presente un utente loggato
-  initializeApp();
+  checkLoggedUserOnInit();
   
 }
 
-// attende che il DOM sia completamente caricato
+// attende che il DOM sia completamente caricato e avvia l'inizializzazione tramite la funzione init
 document.addEventListener("DOMContentLoaded", init);

@@ -1,5 +1,4 @@
 import { modalTitleEl, modalBodyEl } from "./references.js";
-
 import { sectionBookings, sectionAdminBooking } from "./references.js";
 import { showSection } from "./navigationHandlers.js";
 
@@ -23,11 +22,6 @@ export function showModal(title, message) {
     document.getElementById("main-content").focus();
   });
 }
-
-export function capitalizeFirstLetter(string) {
-  return string.charAt(0).toUpperCase() + string.slice(1);
-}
-
 export function updateBookingUIBasedOnRole(role) {
   if (role === "admin") {
     showSection(sectionAdminBooking);
@@ -35,7 +29,6 @@ export function updateBookingUIBasedOnRole(role) {
     showSection(sectionBookings);
   }
 }
-
 export function calculateTotalPrice(startDate, endDate, pricePerDay) {
   if (!startDate || !endDate || !pricePerDay) return 0;
 
@@ -48,12 +41,10 @@ export function calculateTotalPrice(startDate, endDate, pricePerDay) {
 
   return days > 0 ? days * pricePerDay : 0;
 }
-
 export function showLoading() {
   const loadingScreen = document.getElementById("loading-screen");
   loadingScreen.classList.remove("hidden");
 }
-
 export function hideLoading() {
   const loadingScreen = document.getElementById("loading-screen");
   loadingScreen.classList.add("hidden");

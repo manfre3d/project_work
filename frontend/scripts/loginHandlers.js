@@ -10,9 +10,12 @@ import {
   btnLogin
 } from "./references.js";
 import { updateBookingUIBasedOnRole } from "./utility.js";
-import { loadAllBookings } from "./bookingHandlers.js";
+import { loadAllBookings } from "./booking/bookingHandlers.js";
 
-export async function initializeApp() {
+/**
+  * funzione per verificare se è presente un utente loggato all'avvio dell'applicazione
+ */
+export async function checkLoggedUserOnInit() {
 
   console.log("Inizializzazione app...");
   try {
@@ -45,7 +48,10 @@ export async function initializeApp() {
     hideLoading(); 
   }
 }
-
+/**
+  * funzione per gestire il login dell'utente, in caso di successo 
+  * indirizza l'utente alla pagina di prenotazione inizializzando la pagina di prenotazione
+ */
 export function setupLoginHandler() {
   loginForm.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -92,6 +98,11 @@ export function setupLoginHandler() {
     }
   });
 }
+/**
+  * funzione per gestire il logout dell'utente. 
+  * reinizzializza le variabili di sessione e indirizza l'utente alla pagina di login
+  * 
+*/
 export function setupLogoutHandler() {
   console.log("btnLogout:", btnLogout); // log per verificare il riferimento
   if (!btnLogout) {
@@ -129,7 +140,9 @@ export function setupLogoutHandler() {
     }
   });
 }
-
+/**
+ * funzione per gestire la registrazione dell'utente
+ */
 export function setupRegisterHandler() {
   //form di registrazione
 
