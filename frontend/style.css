@@ -25,6 +25,9 @@ body {
   transform: scale(1.05);
 }
 
+#register-link{
+  cursor:pointer
+}
 /* stile del pulsante di login */
 #btn-login {
   color: #fff !important;
@@ -435,3 +438,4 @@ form button.btn {
 .hidden {
   display: none;
 }
+
