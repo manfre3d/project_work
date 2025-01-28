@@ -2,7 +2,6 @@ import json
 from db import get_connection
 from utility.utility import set_headers
 
-
 def handle_get_all_services(handler):
     """
     GET /services - Ritorna tutti i servizi dal DB.
@@ -30,7 +29,6 @@ def handle_get_all_services(handler):
     response_data = json.dumps(results).encode("utf-8")
     set_headers(handler, 200, response_data)
     handler.wfile.write(response_data)
-
 
 def handle_get_service_by_id(handler, service_id):
     """
@@ -69,7 +67,6 @@ def handle_get_service_by_id(handler, service_id):
         error_response = json.dumps({"error": "Service not found"}).encode("utf-8")
         set_headers(handler, 404, error_response)
         handler.wfile.write(error_response)
-
 
 def handle_create_service(handler):
     """
@@ -116,7 +113,6 @@ def handle_create_service(handler):
 
     set_headers(handler, 201, response_data)
     handler.wfile.write(response_data)
-
 
 def handle_update_service(handler, service_id):
     """
@@ -188,7 +184,6 @@ def handle_update_service(handler, service_id):
     response_data = json.dumps(updated_service).encode("utf-8")
     set_headers(handler, 200, response_data)
     handler.wfile.write(response_data)
-
 
 def handle_delete_service(handler, service_id):
     """

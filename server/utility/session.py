@@ -66,3 +66,4 @@ def clean_expired_sessions():
             DELETE FROM sessions WHERE expires_at < ?
         """, (datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),))
         conn.commit()
+

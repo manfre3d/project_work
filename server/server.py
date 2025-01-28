@@ -10,6 +10,7 @@ class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
     """Server HTTP che supporta il multi-threading."""
     # quando il server è terminato chiude i thread 
     daemon_threads = True
+
 class MyHandler(BaseHTTPRequestHandler):
     server_version = "CustomHTTPServer"
     sys_version = ""
@@ -103,7 +104,6 @@ class MyHandler(BaseHTTPRequestHandler):
         """Gestisce le richieste DELETE."""
         route_request(self, "DELETE")
 
-
 def run_server(port=8000):
     """Avvia il server multi-threaded."""
     init_db()
@@ -118,7 +118,6 @@ def run_server(port=8000):
         httpd.shutdown()
         httpd.server_close()
         print("Server terminato correttamente.")
-
 
 if __name__ == "__main__":
     run_server()

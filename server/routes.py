@@ -27,6 +27,9 @@ from service_routes import (
 from utility.authentication import verify_authentication
 
 def route_request(handler, method):
+    ''' Gestisce le richieste http provenienti da server.py
+    in base al metodo HTTP e al percorso richiesto. '''
+    
     # rotte publiche che non richiedono autenticazione
     public_routes = [
         ("login", "POST"),
@@ -104,7 +107,7 @@ def route_request(handler, method):
     if resource == "users":
         if resource_id is None:
             if method == "GET":
-                handle_get_all_users(handler)
+                handle_get_all_users(handler,authenticated_user)
             elif method == "POST":
                 handle_create_user(handler)
             else:
@@ -133,6 +136,7 @@ def route_request(handler, method):
 
 
 def handle_404(handler):
+    ''' Funzione di default per gestire le richieste HTTP per rotte non trovate. '''
     error_response = json.dumps({"error": "Rotta non trovata"}).encode("utf-8")
     set_headers(handler, 404,error_response)
     handler.wfile.write(error_response)

@@ -4,7 +4,6 @@ from db import get_connection
 from utility.authentication import authenticate
 from utility.utility import set_headers
 from utility.session import create_session, delete_session
-
 import bcrypt
 
 def handle_login(handler):
@@ -117,9 +116,8 @@ def handle_logout(handler):
     )
     handler.wfile.write(response_data)
 
-def handle_get_all_users(handler):
+def handle_get_all_users(handler,authenticated_user):
     """GET /users - Ritorna tutti gli utenti senza le password."""
-    authenticated_user = authenticate(handler)
     # tramite autorizzazione, permette solo agli utenti con ruolo admin
     # di vedere tutti gli utenti
     if authenticated_user["role"] != "admin":
@@ -146,7 +144,6 @@ def handle_get_all_users(handler):
 
     set_headers(handler, 200, response_data)
     handler.wfile.write(response_data)
-
 
 def handle_get_user_by_id(handler, user_id):
     """GET /users/<id> - Ritorna il singolo utente se esiste."""
@@ -177,8 +174,8 @@ def handle_get_user_by_id(handler, user_id):
     else:
         error_response = json.dumps({"error": "User non trovato"}).encode("utf-8")
         set_headers(handler, 404, error_response)
-        handler.wfile.write(error_response)
-    
+        handler.wfile.write(error_response)   
+
 def handle_get_current_user(handler):
     """
     GET /current-user
@@ -220,9 +217,8 @@ def handle_get_current_user(handler):
         print("sessione non valida")
         
         set_headers(handler, 401, error_response)
-        handler.wfile.write(error_response)
-        
-        
+        handler.wfile.write(error_response)      
+
 def handle_create_user(handler):
     """POST /users - Crea un nuovo utente nel DB."""
     content_length = int(handler.headers.get("Content-Length", 0))
