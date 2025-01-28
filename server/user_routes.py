@@ -219,6 +219,35 @@ def handle_get_current_user(handler):
         set_headers(handler, 401, error_response)
         handler.wfile.write(error_response)      
 
+def is_valid_password(password: str) -> bool:
+    """
+    Verifica se la password inserita per la registrazione utente e'valida.
+    I constrolli per la password sono i seguenti:
+    - Verifica lunghezza 8 caratteri
+    - Verifica presenza di una lettera maiuscola
+    - Verifica presenza di una lettera minuscola
+    - Verifica presenza di un numero
+    - Verifica presenza di un carattere speciale
+    """
+    if len(password) < 8:
+        return False
+
+    if not any(char.isupper() for char in password):
+        return False
+
+    if not any(char.islower() for char in password):
+        return False
+
+    if not any(char.isdigit() for char in password):
+        return False
+    
+    # Caratteri speciali da accettare nella password
+    special_characters = "!@#$%^&*()_+-=[]{}\\|;:'\",.<>?/`~"
+    if not any(char in special_characters for char in password):
+        return False
+
+    return True
+
 def handle_create_user(handler):
     """POST /users - Crea un nuovo utente nel DB."""
     content_length = int(handler.headers.get("Content-Length", 0))
@@ -251,7 +280,14 @@ def handle_create_user(handler):
         set_headers(handler, 400, error_response)
         handler.wfile.write(error_response)
         return
-
+    # validazione password
+    if not is_valid_password(password):
+        error_response = json.dumps({"error": "Password non valida la password deve avere la seguente froma:  almeno 8 caratteri, "
+                "almeno una lettera minuscola, almeno una lettera maiuscola, un numero e un carattere speciale."}).encode("utf-8")
+        set_headers(handler, 400, error_response)
+        handler.wfile.write(error_response)
+        return
+    
     # hashing della  password tramite l'utililizzo di bcrypt
     hashed_pw = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
