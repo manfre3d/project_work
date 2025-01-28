@@ -44,7 +44,7 @@ export async function checkLoggedUserOnInit() {
     }
   } catch (error) {
     console.error("Errore durante il recupero dell'utente:", error);
-  }finally {
+  } finally {
     hideLoading(); 
   }
 }
@@ -162,6 +162,7 @@ export function setupRegisterHandler() {
     }
 
     try {
+      showLoading();
       const response = await fetch("users", {
         method: "POST",
         headers: {
@@ -187,6 +188,8 @@ export function setupRegisterHandler() {
     } catch (error) {
       console.error("Errore durante la registrazione:", error);
       showModal("Errore", `Registrazione fallita: ${error.message}`);
+    } finally {
+      hideLoading(); 
     }
   });
 }
