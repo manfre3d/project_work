@@ -30,7 +30,6 @@ def seed_services():
         conn.commit()
         print("Servizi di default inseriti.")
 
-
 def seed_bookings():
     """Popola la tabella bookings con dati di default."""
     bookings = [
@@ -47,7 +46,6 @@ def seed_bookings():
             """, (booking["user_id"], booking["service_id"], booking["start_date"], booking["end_date"], booking["status"], booking["capacity_requested"], booking["total_price"]))
         conn.commit()
         print("Prenotazioni di default inserite.")
-
 
 def seed_users():
     """Popola la tabella users con utenti di default."""
@@ -67,7 +65,6 @@ def seed_users():
             """, (user["username"], user["password"], user["email"], user["role"]))
         conn.commit()
         print("Utenti di default inseriti.")
-
 
 def seed_all():
     """Esegue tutti i seed di default."""

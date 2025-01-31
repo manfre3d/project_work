@@ -133,8 +133,6 @@ def route_request(handler, method):
     # se la rotta non è trovata
     handle_404(handler)
 
-
-
 def handle_404(handler):
     ''' Funzione di default per gestire le richieste HTTP per rotte non trovate. '''
     error_response = json.dumps({"error": "Rotta non trovata"}).encode("utf-8")

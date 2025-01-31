@@ -108,7 +108,6 @@ def handle_get_booking_by_id(handler, booking_id):
         set_headers(handler, 404, error_response)
         handler.wfile.write(error_response)
 
-
 def handle_create_booking(handler, authenticated_user):
     """Handler per POST /bookings - Crea una nuova prenotazione."""
     content_length = int(handler.headers.get("Content-Length", 0))
@@ -172,6 +171,7 @@ def _send_error(handler, code, message):
     error_response = json.dumps({"error": message}).encode("utf-8")
     set_headers(handler, code, error_response)
     handler.wfile.write(error_response)
+
 def handle_update_booking(handler, authenticated_user, booking_id):
     """
     PUT /bookings/<id> - Aggiorna una prenotazione esistente per id.
