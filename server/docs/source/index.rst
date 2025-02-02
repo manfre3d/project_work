@@ -1,18 +1,12 @@
-.. prokect_work_mp documentation master file, created by
-   sphinx-quickstart on Sun Feb  2 20:50:55 2025.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+Documentazione del Progetto prokect_work_mp
+===========================================
 
-prokect_work_mp documentation
-=============================
+Benvenuto nella documentazione del progetto **prokect_work_di_manfredi_piraino**. Qui troverai tutte le informazioni necessarie per comprendere e utilizzare il progetto.
 
-Add your content using ``reStructuredText`` syntax. See the
-`reStructuredText <https://www.sphinx-doc.org/en/master/usage/restructuredtext/index.html>`_
-documentation for details.
-
+Per maggiori informazioni consulta la documentazione di seguito.
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :caption: Contenuti:
 
    modules
