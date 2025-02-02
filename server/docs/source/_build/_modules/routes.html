@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+
+<html lang="it" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>routes &#8212; Documentazione prokect_work_mp 1.0 </title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=686e5160" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <script src="../_static/documentation_options.js?v=945aedf1"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/translations.js?v=45930005"></script>
+    <link rel="index" title="Indice" href="../genindex.html" />
+    <link rel="search" title="Cerca" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Codice sorgente per routes</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Provides common classes and functions most users will want access to.&quot;&quot;&quot;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">threading</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">_RequestConfig</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    RequestConfig thread-local singleton</span>
+
+<span class="sd">    The Routes RequestConfig object is a thread-local singleton that should</span>
+<span class="sd">    be initialized by the web framework that is utilizing Routes.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">__shared_state</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">local</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__getattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__shared_state</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        If the name is environ, load the wsgi envion with load_wsgi_environ</span>
+<span class="sd">        and set the environ</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="s1">&#39;environ&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">load_wsgi_environ</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">__shared_state</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">__shared_state</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__delattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+        <span class="nb">delattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__shared_state</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">load_wsgi_environ</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">environ</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Load the protocol/server info from the environ and store it.</span>
+<span class="sd">        Also, match the incoming URL if there&#39;s already a mapper, and</span>
+<span class="sd">        store the resulting match dict in mapper_dict.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="s1">&#39;HTTPS&#39;</span> <span class="ow">in</span> <span class="n">environ</span> <span class="ow">or</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;wsgi.url_scheme&#39;</span><span class="p">)</span> <span class="o">==</span> <span class="s1">&#39;https&#39;</span> \
+           <span class="ow">or</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;HTTP_X_FORWARDED_PROTO&#39;</span><span class="p">)</span> <span class="o">==</span> <span class="s1">&#39;https&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__shared_state</span><span class="o">.</span><span class="n">protocol</span> <span class="o">=</span> <span class="s1">&#39;https&#39;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__shared_state</span><span class="o">.</span><span class="n">protocol</span> <span class="o">=</span> <span class="s1">&#39;http&#39;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">mapper</span><span class="o">.</span><span class="n">environ</span> <span class="o">=</span> <span class="n">environ</span>
+        <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+            <span class="k">pass</span>
+
+        <span class="c1"># Wrap in try/except as common case is that there is a mapper</span>
+        <span class="c1"># attached to self</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="s1">&#39;PATH_INFO&#39;</span> <span class="ow">in</span> <span class="n">environ</span><span class="p">:</span>
+                <span class="n">mapper</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mapper</span>
+                <span class="n">path</span> <span class="o">=</span> <span class="n">environ</span><span class="p">[</span><span class="s1">&#39;PATH_INFO&#39;</span><span class="p">]</span>
+                <span class="n">result</span> <span class="o">=</span> <span class="n">mapper</span><span class="o">.</span><span class="n">routematch</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">result</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">__shared_state</span><span class="o">.</span><span class="n">mapper_dict</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">__shared_state</span><span class="o">.</span><span class="n">route</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">__shared_state</span><span class="o">.</span><span class="n">mapper_dict</span> <span class="o">=</span> <span class="kc">None</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">__shared_state</span><span class="o">.</span><span class="n">route</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+            <span class="k">pass</span>
+
+        <span class="k">if</span> <span class="s1">&#39;HTTP_X_FORWARDED_HOST&#39;</span> <span class="ow">in</span> <span class="n">environ</span><span class="p">:</span>
+            <span class="c1"># Apache will add multiple comma separated values to</span>
+            <span class="c1"># X-Forwarded-Host if there are multiple reverse proxies</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__shared_state</span><span class="o">.</span><span class="n">host</span> <span class="o">=</span> \
+                <span class="n">environ</span><span class="p">[</span><span class="s1">&#39;HTTP_X_FORWARDED_HOST&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;, &#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">elif</span> <span class="s1">&#39;HTTP_HOST&#39;</span> <span class="ow">in</span> <span class="n">environ</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__shared_state</span><span class="o">.</span><span class="n">host</span> <span class="o">=</span> <span class="n">environ</span><span class="p">[</span><span class="s1">&#39;HTTP_HOST&#39;</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__shared_state</span><span class="o">.</span><span class="n">host</span> <span class="o">=</span> <span class="n">environ</span><span class="p">[</span><span class="s1">&#39;SERVER_NAME&#39;</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">environ</span><span class="p">[</span><span class="s1">&#39;wsgi.url_scheme&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;https&#39;</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">environ</span><span class="p">[</span><span class="s1">&#39;SERVER_PORT&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="s1">&#39;443&#39;</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">__shared_state</span><span class="o">.</span><span class="n">host</span> <span class="o">+=</span> <span class="s1">&#39;:&#39;</span> <span class="o">+</span> <span class="n">environ</span><span class="p">[</span><span class="s1">&#39;SERVER_PORT&#39;</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">environ</span><span class="p">[</span><span class="s1">&#39;SERVER_PORT&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="s1">&#39;80&#39;</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">__shared_state</span><span class="o">.</span><span class="n">host</span> <span class="o">+=</span> <span class="s1">&#39;:&#39;</span> <span class="o">+</span> <span class="n">environ</span><span class="p">[</span><span class="s1">&#39;SERVER_PORT&#39;</span><span class="p">]</span>
+
+
+<div class="viewcode-block" id="request_config">
+<a class="viewcode-back" href="../routes.html#routes.request_config">[documenti]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">request_config</span><span class="p">(</span><span class="n">original</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Returns the Routes RequestConfig object.</span>
+
+<span class="sd">    To get the Routes RequestConfig:</span>
+
+<span class="sd">    &gt;&gt;&gt; from routes import *</span>
+<span class="sd">    &gt;&gt;&gt; config = request_config()</span>
+
+<span class="sd">    The following attributes must be set on the config object every request:</span>
+
+<span class="sd">    mapper</span>
+<span class="sd">        mapper should be a Mapper instance thats ready for use</span>
+<span class="sd">    host</span>
+<span class="sd">        host is the hostname of the webapp</span>
+<span class="sd">    protocol</span>
+<span class="sd">        protocol is the protocol of the current request</span>
+<span class="sd">    mapper_dict</span>
+<span class="sd">        mapper_dict should be the dict returned by mapper.match()</span>
+<span class="sd">    redirect</span>
+<span class="sd">        redirect should be a function that issues a redirect,</span>
+<span class="sd">        and takes a url as the sole argument</span>
+<span class="sd">    prefix (optional)</span>
+<span class="sd">        Set if the application is moved under a URL prefix. Prefix</span>
+<span class="sd">        will be stripped before matching, and prepended on generation</span>
+<span class="sd">    environ (optional)</span>
+<span class="sd">        Set to the WSGI environ for automatic prefix support if the</span>
+<span class="sd">        webapp is underneath a &#39;SCRIPT_NAME&#39;</span>
+
+<span class="sd">        Setting the environ will use information in environ to try and</span>
+<span class="sd">        populate the host/protocol/mapper_dict options if you&#39;ve already</span>
+<span class="sd">        set a mapper.</span>
+
+<span class="sd">    **Using your own requst local**</span>
+
+<span class="sd">    If you have your own request local object that you&#39;d like to use instead</span>
+<span class="sd">    of the default thread local provided by Routes, you can configure Routes</span>
+<span class="sd">    to use it::</span>
+
+<span class="sd">        from routes import request_config()</span>
+<span class="sd">        config = request_config()</span>
+<span class="sd">        if hasattr(config, &#39;using_request_local&#39;):</span>
+<span class="sd">            config.request_local = YourLocalCallable</span>
+<span class="sd">            config = request_config()</span>
+
+<span class="sd">    Once you have configured request_config, its advisable you retrieve it</span>
+<span class="sd">    again to get the object you wanted. The variable you assign to</span>
+<span class="sd">    request_local is assumed to be a callable that will get the local config</span>
+<span class="sd">    object you wish.</span>
+
+<span class="sd">    This example tests for the presence of the &#39;using_request_local&#39; attribute</span>
+<span class="sd">    which will be present if you haven&#39;t assigned it yet. This way you can</span>
+<span class="sd">    avoid repeat assignments of the request specific callable.</span>
+
+<span class="sd">    Should you want the original object, perhaps to change the callable its</span>
+<span class="sd">    using or stop this behavior, call request_config(original=True).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">obj</span> <span class="o">=</span> <span class="n">_RequestConfig</span><span class="p">()</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">obj</span><span class="o">.</span><span class="n">request_local</span> <span class="ow">and</span> <span class="n">original</span> <span class="ow">is</span> <span class="kc">False</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="s1">&#39;request_local&#39;</span><span class="p">)()</span>
+    <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+        <span class="n">obj</span><span class="o">.</span><span class="n">request_local</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">obj</span><span class="o">.</span><span class="n">using_request_local</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="k">return</span> <span class="n">_RequestConfig</span><span class="p">()</span></div>
+
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">routes.mapper</span><span class="w"> </span><span class="kn">import</span> <span class="n">Mapper</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">routes.util</span><span class="w"> </span><span class="kn">import</span> <span class="n">redirect_to</span><span class="p">,</span> <span class="n">url_for</span><span class="p">,</span> <span class="n">URLGenerator</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;Mapper&#39;</span><span class="p">,</span> <span class="s1">&#39;url_for&#39;</span><span class="p">,</span> <span class="s1">&#39;URLGenerator&#39;</span><span class="p">,</span> <span class="s1">&#39;redirect_to&#39;</span><span class="p">,</span> <span class="s1">&#39;request_config&#39;</span><span class="p">]</span>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">prokect_work_mp</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Vai" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigazione</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../modules.html">server</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Codice del modulo</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2025, manfredi_piraino.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.1.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

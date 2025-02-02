@@ -1,0 +1,1410 @@
+<!DOCTYPE html>
+
+<html lang="it" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>routes.mapper &#8212; Documentazione prokect_work_mp 1.0 </title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../../_static/basic.css?v=686e5160" />
+    <link rel="stylesheet" type="text/css" href="../../_static/alabaster.css?v=27fed22d" />
+    <script src="../../_static/documentation_options.js?v=945aedf1"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/translations.js?v=45930005"></script>
+    <link rel="index" title="Indice" href="../../genindex.html" />
+    <link rel="search" title="Cerca" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Codice sorgente per routes.mapper</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Mapper and Sub-Mapper&quot;&quot;&quot;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">collections</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">itertools</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">it</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">threading</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">repoze.lru</span><span class="w"> </span><span class="kn">import</span> <span class="n">LRUCache</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">six</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">routes</span><span class="w"> </span><span class="kn">import</span> <span class="n">request_config</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">routes.util</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">controller_scan</span><span class="p">,</span>
+    <span class="n">RoutesException</span><span class="p">,</span>
+    <span class="n">as_unicode</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">routes.route</span><span class="w"> </span><span class="kn">import</span> <span class="n">Route</span>
+
+
+<span class="n">COLLECTION_ACTIONS</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;index&#39;</span><span class="p">,</span> <span class="s1">&#39;create&#39;</span><span class="p">,</span> <span class="s1">&#39;new&#39;</span><span class="p">]</span>
+<span class="n">MEMBER_ACTIONS</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;show&#39;</span><span class="p">,</span> <span class="s1">&#39;update&#39;</span><span class="p">,</span> <span class="s1">&#39;delete&#39;</span><span class="p">,</span> <span class="s1">&#39;edit&#39;</span><span class="p">]</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">strip_slashes</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Remove slashes from the beginning and end of a part/URL.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">):</span>
+        <span class="n">name</span> <span class="o">=</span> <span class="n">name</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
+    <span class="k">if</span> <span class="n">name</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">):</span>
+        <span class="n">name</span> <span class="o">=</span> <span class="n">name</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">name</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">SubMapperParent</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Base class for Mapper and SubMapper, both of which may be the parent</span>
+<span class="sd">    of SubMapper objects</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">submapper</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a partial version of the Mapper with the designated</span>
+<span class="sd">        options set</span>
+
+<span class="sd">        This results in a :class:`routes.mapper.SubMapper` object.</span>
+
+<span class="sd">        If keyword arguments provided to this method also exist in the</span>
+<span class="sd">        keyword arguments provided to the submapper, their values will</span>
+<span class="sd">        be merged with the saved options going first.</span>
+
+<span class="sd">        In addition to :class:`routes.route.Route` arguments, submapper</span>
+<span class="sd">        can also take a ``path_prefix`` argument which will be</span>
+<span class="sd">        prepended to the path of all routes that are connected.</span>
+
+<span class="sd">        Example::</span>
+
+<span class="sd">            &gt;&gt;&gt; map = Mapper(controller_scan=None)</span>
+<span class="sd">            &gt;&gt;&gt; map.connect(&#39;home&#39;, &#39;/&#39;, controller=&#39;home&#39;, action=&#39;splash&#39;)</span>
+<span class="sd">            &gt;&gt;&gt; map.matchlist[0].name == &#39;home&#39;</span>
+<span class="sd">            True</span>
+<span class="sd">            &gt;&gt;&gt; m = map.submapper(controller=&#39;home&#39;)</span>
+<span class="sd">            &gt;&gt;&gt; m.connect(&#39;index&#39;, &#39;/index&#39;, action=&#39;index&#39;)</span>
+<span class="sd">            &gt;&gt;&gt; map.matchlist[1].name == &#39;index&#39;</span>
+<span class="sd">            True</span>
+<span class="sd">            &gt;&gt;&gt; map.matchlist[1].defaults[&#39;controller&#39;] == &#39;home&#39;</span>
+<span class="sd">            True</span>
+
+<span class="sd">        Optional ``collection_name`` and ``resource_name`` arguments are</span>
+<span class="sd">        used in the generation of route names by the ``action`` and</span>
+<span class="sd">        ``link`` methods.  These in turn are used by the ``index``,</span>
+<span class="sd">        ``new``, ``create``, ``show``, ``edit``, ``update`` and</span>
+<span class="sd">        ``delete`` methods which may be invoked indirectly by listing</span>
+<span class="sd">        them in the ``actions`` argument.  If the ``formatted`` argument</span>
+<span class="sd">        is set to ``True`` (the default), generated paths are given the</span>
+<span class="sd">        suffix &#39;{.format}&#39; which matches or generates an optional format</span>
+<span class="sd">        extension.</span>
+
+<span class="sd">        Example::</span>
+
+<span class="sd">            &gt;&gt;&gt; from routes.util import url_for</span>
+<span class="sd">            &gt;&gt;&gt; map = Mapper(controller_scan=None)</span>
+<span class="sd">            &gt;&gt;&gt; m = map.submapper(path_prefix=&#39;/entries&#39;, collection_name=&#39;entries&#39;, resource_name=&#39;entry&#39;, actions=[&#39;index&#39;, &#39;new&#39;])</span>
+<span class="sd">            &gt;&gt;&gt; url_for(&#39;entries&#39;) == &#39;/entries&#39;</span>
+<span class="sd">            True</span>
+<span class="sd">            &gt;&gt;&gt; url_for(&#39;new_entry&#39;, format=&#39;xml&#39;) == &#39;/entries/new.xml&#39;</span>
+<span class="sd">            True</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">SubMapper</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kargs</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">collection</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">collection_name</span><span class="p">,</span> <span class="n">resource_name</span><span class="p">,</span> <span class="n">path_prefix</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                   <span class="n">member_prefix</span><span class="o">=</span><span class="s1">&#39;/</span><span class="si">{id}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">controller</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                   <span class="n">collection_actions</span><span class="o">=</span><span class="n">COLLECTION_ACTIONS</span><span class="p">,</span>
+                   <span class="n">member_actions</span><span class="o">=</span><span class="n">MEMBER_ACTIONS</span><span class="p">,</span> <span class="n">member_options</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                   <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a submapper that represents a collection.</span>
+
+<span class="sd">        This results in a :class:`routes.mapper.SubMapper` object, with a</span>
+<span class="sd">        ``member`` property of the same type that represents the collection&#39;s</span>
+<span class="sd">        member resources.</span>
+
+<span class="sd">        Its interface is the same as the ``submapper`` together with</span>
+<span class="sd">        ``member_prefix``, ``member_actions`` and ``member_options``</span>
+<span class="sd">        which are passed to the ``member`` submapper as ``path_prefix``,</span>
+<span class="sd">        ``actions`` and keyword arguments respectively.</span>
+
+<span class="sd">        Example::</span>
+
+<span class="sd">            &gt;&gt;&gt; from routes.util import url_for</span>
+<span class="sd">            &gt;&gt;&gt; map = Mapper(controller_scan=None)</span>
+<span class="sd">            &gt;&gt;&gt; c = map.collection(&#39;entries&#39;, &#39;entry&#39;)</span>
+<span class="sd">            &gt;&gt;&gt; c.member.link(&#39;ping&#39;, method=&#39;POST&#39;)</span>
+<span class="sd">            &gt;&gt;&gt; url_for(&#39;entries&#39;) == &#39;/entries&#39;</span>
+<span class="sd">            True</span>
+<span class="sd">            &gt;&gt;&gt; url_for(&#39;edit_entry&#39;, id=1) == &#39;/entries/1/edit&#39;</span>
+<span class="sd">            True</span>
+<span class="sd">            &gt;&gt;&gt; url_for(&#39;ping_entry&#39;, id=1) == &#39;/entries/1/ping&#39;</span>
+<span class="sd">            True</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">controller</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">controller</span> <span class="o">=</span> <span class="n">resource_name</span> <span class="ow">or</span> <span class="n">collection_name</span>
+
+        <span class="k">if</span> <span class="n">path_prefix</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">collection_name</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">path_prefix_str</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">path_prefix_str</span> <span class="o">=</span> <span class="s1">&#39;/</span><span class="si">{collection_name}</span><span class="s1">&#39;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">collection_name</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">path_prefix_str</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">{pre}</span><span class="s2">&quot;</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">path_prefix_str</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">{pre}</span><span class="s2">/</span><span class="si">{collection_name}</span><span class="s2">&quot;</span>
+
+        <span class="c1"># generate what will be the path prefix for the collection</span>
+        <span class="n">path_prefix</span> <span class="o">=</span> <span class="n">path_prefix_str</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">pre</span><span class="o">=</span><span class="n">path_prefix</span><span class="p">,</span>
+                                             <span class="n">collection_name</span><span class="o">=</span><span class="n">collection_name</span><span class="p">)</span>
+
+        <span class="n">collection</span> <span class="o">=</span> <span class="n">SubMapper</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">collection_name</span><span class="o">=</span><span class="n">collection_name</span><span class="p">,</span>
+                               <span class="n">resource_name</span><span class="o">=</span><span class="n">resource_name</span><span class="p">,</span>
+                               <span class="n">path_prefix</span><span class="o">=</span><span class="n">path_prefix</span><span class="p">,</span> <span class="n">controller</span><span class="o">=</span><span class="n">controller</span><span class="p">,</span>
+                               <span class="n">actions</span><span class="o">=</span><span class="n">collection_actions</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="n">collection</span><span class="o">.</span><span class="n">member</span> <span class="o">=</span> <span class="n">SubMapper</span><span class="p">(</span><span class="n">collection</span><span class="p">,</span> <span class="n">path_prefix</span><span class="o">=</span><span class="n">member_prefix</span><span class="p">,</span>
+                                      <span class="n">actions</span><span class="o">=</span><span class="n">member_actions</span><span class="p">,</span>
+                                      <span class="o">**</span><span class="p">(</span><span class="n">member_options</span> <span class="ow">or</span> <span class="p">{}))</span>
+
+        <span class="k">return</span> <span class="n">collection</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">SubMapper</span><span class="p">(</span><span class="n">SubMapperParent</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Partial mapper for use with_options&quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">resource_name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">collection_name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                 <span class="n">actions</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">formatted</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">kwargs</span> <span class="o">=</span> <span class="n">kwargs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">obj</span> <span class="o">=</span> <span class="n">obj</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">collection_name</span> <span class="o">=</span> <span class="n">collection_name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">member</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">resource_name</span> <span class="o">=</span> <span class="n">resource_name</span> \
+            <span class="ow">or</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="s1">&#39;resource_name&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> \
+            <span class="ow">or</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;controller&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> \
+            <span class="ow">or</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="s1">&#39;controller&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">formatted</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">formatted</span> <span class="o">=</span> <span class="n">formatted</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">formatted</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="s1">&#39;formatted&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">formatted</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">formatted</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add_actions</span><span class="p">(</span><span class="n">actions</span> <span class="ow">or</span> <span class="p">[],</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">connect</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">routename</span><span class="p">,</span> <span class="n">path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">newkargs</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">_routename</span> <span class="o">=</span> <span class="n">routename</span>
+        <span class="n">_path</span> <span class="o">=</span> <span class="n">path</span>
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">six</span><span class="o">.</span><span class="n">iteritems</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">kwargs</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="o">==</span> <span class="s1">&#39;path_prefix&#39;</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">path</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="c1"># if there&#39;s a name_prefix, add it to the route name</span>
+                    <span class="c1"># and if there&#39;s a path_prefix</span>
+                    <span class="n">_path</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">kwargs</span><span class="p">[</span><span class="n">key</span><span class="p">],</span> <span class="n">path</span><span class="p">))</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">_path</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">kwargs</span><span class="p">[</span><span class="n">key</span><span class="p">],</span> <span class="n">routename</span><span class="p">))</span>
+            <span class="k">elif</span> <span class="n">key</span> <span class="o">==</span> <span class="s1">&#39;name_prefix&#39;</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">path</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="c1"># if there&#39;s a name_prefix, add it to the route name</span>
+                    <span class="c1"># and if there&#39;s a path_prefix</span>
+                    <span class="n">_routename</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">kwargs</span><span class="p">[</span><span class="n">key</span><span class="p">],</span> <span class="n">routename</span><span class="p">))</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">_routename</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">elif</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+                    <span class="n">newkargs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">[</span><span class="n">key</span><span class="p">])</span>  <span class="c1"># merge dicts</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="c1"># Originally used this form:</span>
+                    <span class="c1"># newkargs[key] = value + kwargs[key]</span>
+                    <span class="c1"># New version avoids the inheritance concatenation issue</span>
+                    <span class="c1"># with submappers. Only prefixes concatenate, everything</span>
+                    <span class="c1"># else overrides in submappers.</span>
+                    <span class="n">newkargs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">newkargs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">kwargs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">kwargs</span><span class="p">:</span>
+                <span class="n">newkargs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+
+        <span class="n">newargs</span> <span class="o">=</span> <span class="p">(</span><span class="n">_routename</span><span class="p">,</span> <span class="n">_path</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">obj</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="o">*</span><span class="n">newargs</span><span class="p">,</span> <span class="o">**</span><span class="n">newkargs</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">link</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rel</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;GET&#39;</span><span class="p">,</span>
+             <span class="n">formatted</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Generates a named route for a subresource.</span>
+
+<span class="sd">        Example::</span>
+
+<span class="sd">            &gt;&gt;&gt; from routes.util import url_for</span>
+<span class="sd">            &gt;&gt;&gt; map = Mapper(controller_scan=None)</span>
+<span class="sd">            &gt;&gt;&gt; c = map.collection(&#39;entries&#39;, &#39;entry&#39;)</span>
+<span class="sd">            &gt;&gt;&gt; c.link(&#39;recent&#39;, name=&#39;recent_entries&#39;)</span>
+<span class="sd">            &gt;&gt;&gt; c.member.link(&#39;ping&#39;, method=&#39;POST&#39;, formatted=True)</span>
+<span class="sd">            &gt;&gt;&gt; url_for(&#39;entries&#39;) == &#39;/entries&#39;</span>
+<span class="sd">            True</span>
+<span class="sd">            &gt;&gt;&gt; url_for(&#39;recent_entries&#39;) == &#39;/entries/recent&#39;</span>
+<span class="sd">            True</span>
+<span class="sd">            &gt;&gt;&gt; url_for(&#39;ping_entry&#39;, id=1) == &#39;/entries/1/ping&#39;</span>
+<span class="sd">            True</span>
+<span class="sd">            &gt;&gt;&gt; url_for(&#39;ping_entry&#39;, id=1, format=&#39;xml&#39;) == &#39;/entries/1/ping.xml&#39;</span>
+<span class="sd">            True</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">formatted</span> <span class="ow">or</span> <span class="p">(</span><span class="n">formatted</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">formatted</span><span class="p">):</span>
+            <span class="n">suffix</span> <span class="o">=</span> <span class="s1">&#39;{.format}&#39;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">suffix</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">name</span> <span class="ow">or</span> <span class="p">(</span><span class="n">rel</span> <span class="o">+</span> <span class="s1">&#39;_&#39;</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">resource_name</span><span class="p">),</span>
+                            <span class="s1">&#39;/&#39;</span> <span class="o">+</span> <span class="p">(</span><span class="n">rel</span> <span class="ow">or</span> <span class="n">name</span><span class="p">)</span> <span class="o">+</span> <span class="n">suffix</span><span class="p">,</span>
+                            <span class="n">action</span><span class="o">=</span><span class="n">action</span> <span class="ow">or</span> <span class="n">rel</span> <span class="ow">or</span> <span class="n">name</span><span class="p">,</span>
+                            <span class="o">**</span><span class="n">_kwargs_with_conditions</span><span class="p">(</span><span class="n">kwargs</span><span class="p">,</span> <span class="n">method</span><span class="p">))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">new</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Generates the &quot;new&quot; link for a collection submapper.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">link</span><span class="p">(</span><span class="n">rel</span><span class="o">=</span><span class="s1">&#39;new&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">edit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Generates the &quot;edit&quot; link for a collection member submapper.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">link</span><span class="p">(</span><span class="n">rel</span><span class="o">=</span><span class="s1">&#39;edit&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">action</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;GET&#39;</span><span class="p">,</span> <span class="n">formatted</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+               <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Generates a named route at the base path of a submapper.</span>
+
+<span class="sd">        Example::</span>
+
+<span class="sd">            &gt;&gt;&gt; from routes import url_for</span>
+<span class="sd">            &gt;&gt;&gt; map = Mapper(controller_scan=None)</span>
+<span class="sd">            &gt;&gt;&gt; c = map.submapper(path_prefix=&#39;/entries&#39;, controller=&#39;entry&#39;)</span>
+<span class="sd">            &gt;&gt;&gt; c.action(action=&#39;index&#39;, name=&#39;entries&#39;, formatted=True)</span>
+<span class="sd">            &gt;&gt;&gt; c.action(action=&#39;create&#39;, method=&#39;POST&#39;)</span>
+<span class="sd">            &gt;&gt;&gt; url_for(controller=&#39;entry&#39;, action=&#39;index&#39;, method=&#39;GET&#39;) == &#39;/entries&#39;</span>
+<span class="sd">            True</span>
+<span class="sd">            &gt;&gt;&gt; url_for(controller=&#39;entry&#39;, action=&#39;index&#39;, method=&#39;GET&#39;, format=&#39;xml&#39;) == &#39;/entries.xml&#39;</span>
+<span class="sd">            True</span>
+<span class="sd">            &gt;&gt;&gt; url_for(controller=&#39;entry&#39;, action=&#39;create&#39;, method=&#39;POST&#39;) == &#39;/entries&#39;</span>
+<span class="sd">            True</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">formatted</span> <span class="ow">or</span> <span class="p">(</span><span class="n">formatted</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">formatted</span><span class="p">):</span>
+            <span class="n">suffix</span> <span class="o">=</span> <span class="s1">&#39;{.format}&#39;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">suffix</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">name</span> <span class="ow">or</span> <span class="p">(</span><span class="n">action</span> <span class="o">+</span> <span class="s1">&#39;_&#39;</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">resource_name</span><span class="p">),</span>
+                            <span class="n">suffix</span><span class="p">,</span>
+                            <span class="n">action</span><span class="o">=</span><span class="n">action</span> <span class="ow">or</span> <span class="n">name</span><span class="p">,</span>
+                            <span class="o">**</span><span class="n">_kwargs_with_conditions</span><span class="p">(</span><span class="n">kwargs</span><span class="p">,</span> <span class="n">method</span><span class="p">))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">index</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Generates the &quot;index&quot; action for a collection submapper.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">collection_name</span><span class="p">,</span>
+                           <span class="n">action</span><span class="o">=</span><span class="s1">&#39;index&#39;</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;GET&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">show</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Generates the &quot;show&quot; action for a collection member submapper.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">resource_name</span><span class="p">,</span>
+                           <span class="n">action</span><span class="o">=</span><span class="s1">&#39;show&#39;</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;GET&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">create</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Generates the &quot;create&quot; action for a collection submapper.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="p">(</span><span class="n">action</span><span class="o">=</span><span class="s1">&#39;create&#39;</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;POST&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Generates the &quot;update&quot; action for a collection member submapper.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="p">(</span><span class="n">action</span><span class="o">=</span><span class="s1">&#39;update&#39;</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;PUT&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">delete</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Generates the &quot;delete&quot; action for a collection member submapper.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="p">(</span><span class="n">action</span><span class="o">=</span><span class="s1">&#39;delete&#39;</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;DELETE&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">add_actions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">actions</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="p">[</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">action</span><span class="p">)(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="k">for</span> <span class="n">action</span> <span class="ow">in</span> <span class="n">actions</span><span class="p">]</span>
+
+    <span class="c1"># Provided for those who prefer using the &#39;with&#39; syntax in Python 2.5+</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">type</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">tb</span><span class="p">):</span>
+        <span class="k">pass</span>
+
+
+<span class="c1"># Create kwargs with a &#39;conditions&#39; member generated for the given method</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_kwargs_with_conditions</span><span class="p">(</span><span class="n">kwargs</span><span class="p">,</span> <span class="n">method</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">method</span> <span class="ow">and</span> <span class="s1">&#39;conditions&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+        <span class="n">newkwargs</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">newkwargs</span><span class="p">[</span><span class="s1">&#39;conditions&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;method&#39;</span><span class="p">:</span> <span class="n">method</span><span class="p">}</span>
+        <span class="k">return</span> <span class="n">newkwargs</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">kwargs</span>
+
+
+<div class="viewcode-block" id="Mapper">
+<a class="viewcode-back" href="../../routes.html#routes.Mapper">[documenti]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Mapper</span><span class="p">(</span><span class="n">SubMapperParent</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Mapper handles URL generation and URL recognition in a web</span>
+<span class="sd">    application.</span>
+
+<span class="sd">    Mapper is built handling dictionary&#39;s. It is assumed that the web</span>
+<span class="sd">    application will handle the dictionary returned by URL recognition</span>
+<span class="sd">    to dispatch appropriately.</span>
+
+<span class="sd">    URL generation is done by passing keyword parameters into the</span>
+<span class="sd">    generate function, a URL is then returned.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">controller_scan</span><span class="o">=</span><span class="n">controller_scan</span><span class="p">,</span> <span class="n">directory</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                 <span class="n">always_scan</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">register</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">explicit</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a new Mapper instance</span>
+
+<span class="sd">        All keyword arguments are optional.</span>
+
+<span class="sd">        ``controller_scan``</span>
+<span class="sd">            Function reference that will be used to return a list of</span>
+<span class="sd">            valid controllers used during URL matching. If</span>
+<span class="sd">            ``directory`` keyword arg is present, it will be passed</span>
+<span class="sd">            into the function during its call. This option defaults to</span>
+<span class="sd">            a function that will scan a directory for controllers.</span>
+
+<span class="sd">            Alternatively, a list of controllers or None can be passed</span>
+<span class="sd">            in which are assumed to be the definitive list of</span>
+<span class="sd">            controller names valid when matching &#39;controller&#39;.</span>
+
+<span class="sd">        ``directory``</span>
+<span class="sd">            Passed into controller_scan for the directory to scan. It</span>
+<span class="sd">            should be an absolute path if using the default</span>
+<span class="sd">            ``controller_scan`` function.</span>
+
+<span class="sd">        ``always_scan``</span>
+<span class="sd">            Whether or not the ``controller_scan`` function should be</span>
+<span class="sd">            run during every URL match. This is typically a good idea</span>
+<span class="sd">            during development so the server won&#39;t need to be restarted</span>
+<span class="sd">            anytime a controller is added.</span>
+
+<span class="sd">        ``register``</span>
+<span class="sd">            Boolean used to determine if the Mapper should use</span>
+<span class="sd">            ``request_config`` to register itself as the mapper. Since</span>
+<span class="sd">            it&#39;s done on a thread-local basis, this is typically best</span>
+<span class="sd">            used during testing though it won&#39;t hurt in other cases.</span>
+
+<span class="sd">        ``explicit``</span>
+<span class="sd">            Boolean used to determine if routes should be connected</span>
+<span class="sd">            with implicit defaults of::</span>
+
+<span class="sd">                {&#39;controller&#39;:&#39;content&#39;,&#39;action&#39;:&#39;index&#39;,&#39;id&#39;:None}</span>
+
+<span class="sd">            When set to True, these defaults will not be added to route</span>
+<span class="sd">            connections and ``url_for`` will not use Route memory.</span>
+
+<span class="sd">        Additional attributes that may be set after mapper</span>
+<span class="sd">        initialization (ie, map.ATTRIBUTE = &#39;something&#39;):</span>
+
+<span class="sd">        ``encoding``</span>
+<span class="sd">            Used to indicate alternative encoding/decoding systems to</span>
+<span class="sd">            use with both incoming URL&#39;s, and during Route generation</span>
+<span class="sd">            when passed a Unicode string. Defaults to &#39;utf-8&#39;.</span>
+
+<span class="sd">        ``decode_errors``</span>
+<span class="sd">            How to handle errors in the encoding, generally ignoring</span>
+<span class="sd">            any chars that don&#39;t convert should be sufficient. Defaults</span>
+<span class="sd">            to &#39;ignore&#39;.</span>
+
+<span class="sd">        ``minimization``</span>
+<span class="sd">            Boolean used to indicate whether or not Routes should</span>
+<span class="sd">            minimize URL&#39;s and the generated URL&#39;s, or require every</span>
+<span class="sd">            part where it appears in the path. Defaults to False.</span>
+
+<span class="sd">        ``hardcode_names``</span>
+<span class="sd">            Whether or not Named Routes result in the default options</span>
+<span class="sd">            for the route being used *or* if they actually force url</span>
+<span class="sd">            generation to use the route. Defaults to False.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">matchlist</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">maxkeys</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">minkeys</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">urlcache</span> <span class="o">=</span> <span class="n">LRUCache</span><span class="p">(</span><span class="mi">1600</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_created_regs</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_created_gens</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_master_regexp</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prefix</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">req_data</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">local</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">directory</span> <span class="o">=</span> <span class="n">directory</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">always_scan</span> <span class="o">=</span> <span class="n">always_scan</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">controller_scan</span> <span class="o">=</span> <span class="n">controller_scan</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_regprefix</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_routenames</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">debug</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">append_slash</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sub_domains</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sub_domains_ignore</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">domain_match</span> <span class="o">=</span> <span class="sa">r</span><span class="s1">&#39;[^\.\/]+?\.[^\.\/]+&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">explicit</span> <span class="o">=</span> <span class="n">explicit</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">encoding</span> <span class="o">=</span> <span class="s1">&#39;utf-8&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">decode_errors</span> <span class="o">=</span> <span class="s1">&#39;ignore&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">hardcode_names</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">minimization</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">create_regs_lock</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Lock</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">register</span><span class="p">:</span>
+            <span class="n">config</span> <span class="o">=</span> <span class="n">request_config</span><span class="p">()</span>
+            <span class="n">config</span><span class="o">.</span><span class="n">mapper</span> <span class="o">=</span> <span class="bp">self</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Generates a tabular string representation.&quot;&quot;&quot;</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">format_methods</span><span class="p">(</span><span class="n">r</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">r</span><span class="o">.</span><span class="n">conditions</span><span class="p">:</span>
+                <span class="n">method</span> <span class="o">=</span> <span class="n">r</span><span class="o">.</span><span class="n">conditions</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;method&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="nb">type</span><span class="p">(</span><span class="n">method</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">str</span> <span class="ow">and</span> <span class="n">method</span> <span class="ow">or</span> <span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">method</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="s1">&#39;&#39;</span>
+
+        <span class="n">table</span> <span class="o">=</span> <span class="p">[(</span><span class="s1">&#39;Route name&#39;</span><span class="p">,</span> <span class="s1">&#39;Methods&#39;</span><span class="p">,</span> <span class="s1">&#39;Path&#39;</span><span class="p">,</span> <span class="s1">&#39;Controller&#39;</span><span class="p">,</span> <span class="s1">&#39;action&#39;</span><span class="p">)]</span> <span class="o">+</span> \
+                <span class="p">[(</span><span class="n">r</span><span class="o">.</span><span class="n">name</span> <span class="ow">or</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">format_methods</span><span class="p">(</span><span class="n">r</span><span class="p">),</span> <span class="n">r</span><span class="o">.</span><span class="n">routepath</span> <span class="ow">or</span> <span class="s1">&#39;&#39;</span><span class="p">,</span>
+                  <span class="n">r</span><span class="o">.</span><span class="n">defaults</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;controller&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">),</span> <span class="n">r</span><span class="o">.</span><span class="n">defaults</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;action&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">))</span>
+                 <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">matchlist</span><span class="p">]</span>
+
+        <span class="n">widths</span> <span class="o">=</span> <span class="p">[</span><span class="nb">max</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="n">col</span><span class="p">])</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">table</span><span class="p">)</span>
+                  <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">table</span><span class="p">[</span><span class="mi">0</span><span class="p">]))]</span>
+
+        <span class="k">return</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+            <span class="s1">&#39; &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="n">col</span><span class="p">]</span><span class="o">.</span><span class="n">ljust</span><span class="p">(</span><span class="n">widths</span><span class="p">[</span><span class="n">col</span><span class="p">])</span>
+                     <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">widths</span><span class="p">)))</span>
+            <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">table</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_envget</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">req_data</span><span class="o">.</span><span class="n">environ</span>
+        <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_envset</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">env</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">req_data</span><span class="o">.</span><span class="n">environ</span> <span class="o">=</span> <span class="n">env</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_envdel</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">req_data</span><span class="o">.</span><span class="n">environ</span>
+    <span class="n">environ</span> <span class="o">=</span> <span class="nb">property</span><span class="p">(</span><span class="n">_envget</span><span class="p">,</span> <span class="n">_envset</span><span class="p">,</span> <span class="n">_envdel</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Mapper.extend">
+<a class="viewcode-back" href="../../routes.html#routes.Mapper.extend">[documenti]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">extend</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">routes</span><span class="p">,</span> <span class="n">path_prefix</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Extends the mapper routes with a list of Route objects</span>
+
+<span class="sd">        If a path_prefix is provided, all the routes will have their</span>
+<span class="sd">        path prepended with the path_prefix.</span>
+
+<span class="sd">        Example::</span>
+
+<span class="sd">            &gt;&gt;&gt; map = Mapper(controller_scan=None)</span>
+<span class="sd">            &gt;&gt;&gt; map.connect(&#39;home&#39;, &#39;/&#39;, controller=&#39;home&#39;, action=&#39;splash&#39;)</span>
+<span class="sd">            &gt;&gt;&gt; map.matchlist[0].name == &#39;home&#39;</span>
+<span class="sd">            True</span>
+<span class="sd">            &gt;&gt;&gt; routes = [Route(&#39;index&#39;, &#39;/index.htm&#39;, controller=&#39;home&#39;,</span>
+<span class="sd">            ...                 action=&#39;index&#39;)]</span>
+<span class="sd">            &gt;&gt;&gt; map.extend(routes)</span>
+<span class="sd">            &gt;&gt;&gt; len(map.matchlist) == 2</span>
+<span class="sd">            True</span>
+<span class="sd">            &gt;&gt;&gt; map.extend(routes, path_prefix=&#39;/subapp&#39;)</span>
+<span class="sd">            &gt;&gt;&gt; len(map.matchlist) == 3</span>
+<span class="sd">            True</span>
+<span class="sd">            &gt;&gt;&gt; map.matchlist[2].routepath == &#39;/subapp/index.htm&#39;</span>
+<span class="sd">            True</span>
+
+<span class="sd">        .. note::</span>
+
+<span class="sd">            This function does not merely extend the mapper with the</span>
+<span class="sd">            given list of routes, it actually creates new routes with</span>
+<span class="sd">            identical calling arguments.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">route</span> <span class="ow">in</span> <span class="n">routes</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">path_prefix</span> <span class="ow">and</span> <span class="n">route</span><span class="o">.</span><span class="n">minimization</span><span class="p">:</span>
+                <span class="n">routepath</span> <span class="o">=</span> <span class="s1">&#39;/&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">path_prefix</span><span class="p">,</span> <span class="n">route</span><span class="o">.</span><span class="n">routepath</span><span class="p">])</span>
+            <span class="k">elif</span> <span class="n">path_prefix</span><span class="p">:</span>
+                <span class="n">routepath</span> <span class="o">=</span> <span class="n">path_prefix</span> <span class="o">+</span> <span class="n">route</span><span class="o">.</span><span class="n">routepath</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">routepath</span> <span class="o">=</span> <span class="n">route</span><span class="o">.</span><span class="n">routepath</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">route</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                         <span class="n">routepath</span><span class="p">,</span>
+                         <span class="n">conditions</span><span class="o">=</span><span class="n">route</span><span class="o">.</span><span class="n">conditions</span><span class="p">,</span>
+                         <span class="o">**</span><span class="n">route</span><span class="o">.</span><span class="n">_kargs</span>
+                         <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Mapper.make_route">
+<a class="viewcode-back" href="../../routes.html#routes.Mapper.make_route">[documenti]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">make_route</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Make a new Route object</span>
+
+<span class="sd">        A subclass can override this method to use a custom Route class.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">Route</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kargs</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Mapper.connect">
+<a class="viewcode-back" href="../../routes.html#routes.Mapper.connect">[documenti]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">connect</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create and connect a new Route to the Mapper.</span>
+
+<span class="sd">        Usage:</span>
+
+<span class="sd">        .. code-block:: python</span>
+
+<span class="sd">            m = Mapper()</span>
+<span class="sd">            m.connect(&#39;:controller/:action/:id&#39;)</span>
+<span class="sd">            m.connect(&#39;date/:year/:month/:day&#39;, controller=&quot;blog&quot;,</span>
+<span class="sd">                      action=&quot;view&quot;)</span>
+<span class="sd">            m.connect(&#39;archives/:page&#39;, controller=&quot;blog&quot;, action=&quot;by_page&quot;,</span>
+<span class="sd">            requirements = { &#39;page&#39;:&#39;\\d{1,2}&#39; })</span>
+<span class="sd">            m.connect(&#39;category_list&#39;, &#39;archives/category/:section&#39;,</span>
+<span class="sd">                      controller=&#39;blog&#39;, action=&#39;category&#39;,</span>
+<span class="sd">                      section=&#39;home&#39;, type=&#39;list&#39;)</span>
+<span class="sd">            m.connect(&#39;home&#39;, &#39;&#39;, controller=&#39;blog&#39;, action=&#39;view&#39;,</span>
+<span class="sd">                      section=&#39;home&#39;)</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">routename</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">routename</span> <span class="o">=</span> <span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">args</span> <span class="o">=</span> <span class="p">(</span><span class="kc">None</span><span class="p">,)</span> <span class="o">+</span> <span class="n">args</span>
+        <span class="k">if</span> <span class="s1">&#39;_explicit&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">kargs</span><span class="p">:</span>
+            <span class="n">kargs</span><span class="p">[</span><span class="s1">&#39;_explicit&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">explicit</span>
+        <span class="k">if</span> <span class="s1">&#39;_minimize&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">kargs</span><span class="p">:</span>
+            <span class="n">kargs</span><span class="p">[</span><span class="s1">&#39;_minimize&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">minimization</span>
+        <span class="n">route</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">make_route</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kargs</span><span class="p">)</span>
+
+        <span class="c1"># Apply encoding and errors if its not the defaults and the route</span>
+        <span class="c1"># didn&#39;t have one passed in.</span>
+        <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">encoding</span> <span class="o">!=</span> <span class="s1">&#39;utf-8&#39;</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">decode_errors</span> <span class="o">!=</span> <span class="s1">&#39;ignore&#39;</span><span class="p">)</span> <span class="ow">and</span> \
+           <span class="s1">&#39;_encoding&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">kargs</span><span class="p">:</span>
+            <span class="n">route</span><span class="o">.</span><span class="n">encoding</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">encoding</span>
+            <span class="n">route</span><span class="o">.</span><span class="n">decode_errors</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">decode_errors</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">route</span><span class="o">.</span><span class="n">static</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">matchlist</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">route</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">routename</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_routenames</span><span class="p">[</span><span class="n">routename</span><span class="p">]</span> <span class="o">=</span> <span class="n">route</span>
+            <span class="n">route</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">routename</span>
+        <span class="k">if</span> <span class="n">route</span><span class="o">.</span><span class="n">static</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="n">exists</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">maxkeys</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="o">==</span> <span class="n">route</span><span class="o">.</span><span class="n">maxkeys</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">maxkeys</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">route</span><span class="p">)</span>
+                <span class="n">exists</span> <span class="o">=</span> <span class="kc">True</span>
+                <span class="k">break</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">exists</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">maxkeys</span><span class="p">[</span><span class="n">route</span><span class="o">.</span><span class="n">maxkeys</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">route</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_created_gens</span> <span class="o">=</span> <span class="kc">False</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_create_gens</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create the generation hashes for route lookups&quot;&quot;&quot;</span>
+        <span class="c1"># Use keys temporailly to assemble the list to avoid excessive</span>
+        <span class="c1"># list iteration testing with &quot;in&quot;</span>
+        <span class="n">controllerlist</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">actionlist</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="c1"># Assemble all the hardcoded/defaulted actions/controllers used</span>
+        <span class="k">for</span> <span class="n">route</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">matchlist</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">route</span><span class="o">.</span><span class="n">static</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="s1">&#39;controller&#39;</span> <span class="ow">in</span> <span class="n">route</span><span class="o">.</span><span class="n">defaults</span><span class="p">:</span>
+                <span class="n">controllerlist</span><span class="p">[</span><span class="n">route</span><span class="o">.</span><span class="n">defaults</span><span class="p">[</span><span class="s1">&#39;controller&#39;</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">if</span> <span class="s1">&#39;action&#39;</span> <span class="ow">in</span> <span class="n">route</span><span class="o">.</span><span class="n">defaults</span><span class="p">:</span>
+                <span class="n">actionlist</span><span class="p">[</span><span class="n">route</span><span class="o">.</span><span class="n">defaults</span><span class="p">[</span><span class="s1">&#39;action&#39;</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">True</span>
+
+        <span class="c1"># Setup the lists of all controllers/actions we&#39;ll add each route</span>
+        <span class="c1"># to. We include the &#39;*&#39; in the case that a generate contains a</span>
+        <span class="c1"># controller/action that has no hardcodes</span>
+        <span class="n">controllerlist</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">controllerlist</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span> <span class="o">+</span> <span class="p">[</span><span class="s1">&#39;*&#39;</span><span class="p">]</span>
+        <span class="n">actionlist</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">actionlist</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span> <span class="o">+</span> <span class="p">[</span><span class="s1">&#39;*&#39;</span><span class="p">]</span>
+
+        <span class="c1"># Go through our list again, assemble the controllers/actions we&#39;ll</span>
+        <span class="c1"># add each route to. If its hardcoded, we only add it to that dict key.</span>
+        <span class="c1"># Otherwise we add it to every hardcode since it can be changed.</span>
+        <span class="n">gendict</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># Our generated two-deep hash</span>
+        <span class="k">for</span> <span class="n">route</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">matchlist</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">route</span><span class="o">.</span><span class="n">static</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">clist</span> <span class="o">=</span> <span class="n">controllerlist</span>
+            <span class="n">alist</span> <span class="o">=</span> <span class="n">actionlist</span>
+            <span class="k">if</span> <span class="s1">&#39;controller&#39;</span> <span class="ow">in</span> <span class="n">route</span><span class="o">.</span><span class="n">hardcoded</span><span class="p">:</span>
+                <span class="n">clist</span> <span class="o">=</span> <span class="p">[</span><span class="n">route</span><span class="o">.</span><span class="n">defaults</span><span class="p">[</span><span class="s1">&#39;controller&#39;</span><span class="p">]]</span>
+            <span class="k">if</span> <span class="s1">&#39;action&#39;</span> <span class="ow">in</span> <span class="n">route</span><span class="o">.</span><span class="n">hardcoded</span><span class="p">:</span>
+                <span class="n">alist</span> <span class="o">=</span> <span class="p">[</span><span class="n">six</span><span class="o">.</span><span class="n">text_type</span><span class="p">(</span><span class="n">route</span><span class="o">.</span><span class="n">defaults</span><span class="p">[</span><span class="s1">&#39;action&#39;</span><span class="p">])]</span>
+            <span class="k">for</span> <span class="n">controller</span> <span class="ow">in</span> <span class="n">clist</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">action</span> <span class="ow">in</span> <span class="n">alist</span><span class="p">:</span>
+                    <span class="n">actiondict</span> <span class="o">=</span> <span class="n">gendict</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">controller</span><span class="p">,</span> <span class="p">{})</span>
+                    <span class="n">actiondict</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">action</span><span class="p">,</span> <span class="p">([],</span> <span class="p">{}))[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">route</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_gendict</span> <span class="o">=</span> <span class="n">gendict</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_created_gens</span> <span class="o">=</span> <span class="kc">True</span>
+
+<div class="viewcode-block" id="Mapper.create_regs">
+<a class="viewcode-back" href="../../routes.html#routes.Mapper.create_regs">[documenti]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_regs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Atomically creates regular expressions for all connected</span>
+<span class="sd">        routes</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">create_regs_lock</span><span class="o">.</span><span class="n">acquire</span><span class="p">()</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_create_regs</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">create_regs_lock</span><span class="o">.</span><span class="n">release</span><span class="p">()</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_create_regs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">clist</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Creates regular expressions for all connected routes&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">clist</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">directory</span><span class="p">:</span>
+                <span class="n">clist</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">controller_scan</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">directory</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="nb">callable</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">controller_scan</span><span class="p">):</span>
+                <span class="n">clist</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">controller_scan</span><span class="p">()</span>
+            <span class="k">elif</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">controller_scan</span><span class="p">:</span>
+                <span class="n">clist</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">clist</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">controller_scan</span>
+
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">six</span><span class="o">.</span><span class="n">iteritems</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">maxkeys</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">route</span> <span class="ow">in</span> <span class="n">val</span><span class="p">:</span>
+                <span class="n">route</span><span class="o">.</span><span class="n">makeregexp</span><span class="p">(</span><span class="n">clist</span><span class="p">)</span>
+
+        <span class="n">regexps</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">prefix2routes</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">route</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">matchlist</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">route</span><span class="o">.</span><span class="n">static</span><span class="p">:</span>
+                <span class="n">regexps</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">route</span><span class="o">.</span><span class="n">makeregexp</span><span class="p">(</span><span class="n">clist</span><span class="p">,</span> <span class="n">include_names</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span>
+                <span class="c1"># Group the routes by static prefix</span>
+                <span class="n">prefix</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">it</span><span class="o">.</span><span class="n">takewhile</span><span class="p">(</span><span class="k">lambda</span> <span class="n">p</span><span class="p">:</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="nb">str</span><span class="p">),</span>
+                                              <span class="n">route</span><span class="o">.</span><span class="n">routelist</span><span class="p">))</span>
+                <span class="k">if</span> <span class="n">route</span><span class="o">.</span><span class="n">minimization</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">prefix</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">):</span>
+                    <span class="n">prefix</span> <span class="o">=</span> <span class="s1">&#39;/&#39;</span> <span class="o">+</span> <span class="n">prefix</span>
+                <span class="n">prefix2routes</span><span class="p">[</span><span class="n">prefix</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">)]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">route</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_prefix2routes</span> <span class="o">=</span> <span class="n">prefix2routes</span>
+        <span class="c1"># Keep track of all possible prefix lengths in decreasing order</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_prefix_lens</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">p</span><span class="p">)</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">prefix2routes</span><span class="p">),</span>
+                                   <span class="n">reverse</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="c1"># Create our regexp to strip the prefix</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">prefix</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_regprefix</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">prefix</span> <span class="o">+</span> <span class="s1">&#39;(.*)&#39;</span><span class="p">)</span>
+
+        <span class="c1"># Save the master regexp</span>
+        <span class="n">regexp</span> <span class="o">=</span> <span class="s1">&#39;|&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="s1">&#39;(?:</span><span class="si">%s</span><span class="s1">)&#39;</span> <span class="o">%</span> <span class="n">x</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">regexps</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_master_reg</span> <span class="o">=</span> <span class="n">regexp</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_master_regexp</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">regexp</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">OverflowError</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_master_regexp</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_created_regs</span> <span class="o">=</span> <span class="kc">True</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_match</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="p">,</span> <span class="n">environ</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Internal Route matcher</span>
+
+<span class="sd">        Matches a URL against a route, and returns a tuple of the match</span>
+<span class="sd">        dict and the route object if a match is successfull, otherwise</span>
+<span class="sd">        it returns empty.</span>
+
+<span class="sd">        For internal use only.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_created_regs</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">controller_scan</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">create_regs</span><span class="p">()</span>
+        <span class="k">elif</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_created_regs</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">RoutesException</span><span class="p">(</span><span class="s2">&quot;You must generate the regular expressions&quot;</span>
+                                  <span class="s2">&quot; before matching.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">always_scan</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">create_regs</span><span class="p">()</span>
+
+        <span class="n">matchlog</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">prefix</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">re</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_regprefix</span><span class="p">,</span> <span class="n">url</span><span class="p">):</span>
+                <span class="n">url</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_regprefix</span><span class="p">,</span> <span class="sa">r</span><span class="s1">&#39;\1&#39;</span><span class="p">,</span> <span class="n">url</span><span class="p">)</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">url</span><span class="p">:</span>
+                    <span class="n">url</span> <span class="o">=</span> <span class="s1">&#39;/&#39;</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">matchlog</span><span class="p">)</span>
+
+        <span class="n">environ</span> <span class="o">=</span> <span class="n">environ</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">environ</span>
+        <span class="n">sub_domains</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sub_domains</span>
+        <span class="n">sub_domains_ignore</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sub_domains_ignore</span>
+        <span class="n">domain_match</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">domain_match</span>
+        <span class="n">debug</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">debug</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_master_regexp</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># Check to see if its a valid url against the main regexp</span>
+            <span class="c1"># Done for faster invalid URL elimination</span>
+            <span class="n">valid_url</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_master_regexp</span><span class="p">,</span> <span class="n">url</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Regex is None due to OverflowError caused by too many routes.</span>
+            <span class="c1"># This will allow larger projects to work but might increase time</span>
+            <span class="c1"># spent invalidating URLs in the loop below.</span>
+            <span class="n">valid_url</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">valid_url</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">matchlog</span><span class="p">)</span>
+
+        <span class="n">matchlist</span> <span class="o">=</span> <span class="n">it</span><span class="o">.</span><span class="n">chain</span><span class="o">.</span><span class="n">from_iterable</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_prefix2routes</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">url</span><span class="p">[:</span><span class="n">prefix_len</span><span class="p">],</span> <span class="p">())</span>
+                                           <span class="k">for</span> <span class="n">prefix_len</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prefix_lens</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">route</span> <span class="ow">in</span> <span class="n">matchlist</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">route</span><span class="o">.</span><span class="n">static</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">debug</span><span class="p">:</span>
+                    <span class="n">matchlog</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="n">route</span><span class="o">=</span><span class="n">route</span><span class="p">,</span> <span class="n">static</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+                <span class="k">continue</span>
+            <span class="n">match</span> <span class="o">=</span> <span class="n">route</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">environ</span><span class="p">,</span> <span class="n">sub_domains</span><span class="p">,</span> <span class="n">sub_domains_ignore</span><span class="p">,</span>
+                                <span class="n">domain_match</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">debug</span><span class="p">:</span>
+                <span class="n">matchlog</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="n">route</span><span class="o">=</span><span class="n">route</span><span class="p">,</span> <span class="n">regexp</span><span class="o">=</span><span class="nb">bool</span><span class="p">(</span><span class="n">match</span><span class="p">)))</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">match</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span> <span class="ow">or</span> <span class="n">match</span><span class="p">:</span>
+                <span class="k">return</span> <span class="p">(</span><span class="n">match</span><span class="p">,</span> <span class="n">route</span><span class="p">,</span> <span class="n">matchlog</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">matchlog</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Mapper.match">
+<a class="viewcode-back" href="../../routes.html#routes.Mapper.match">[documenti]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">match</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">environ</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Match a URL against against one of the routes contained.</span>
+
+<span class="sd">        Will return None if no valid match is found.</span>
+
+<span class="sd">        .. code-block:: python</span>
+
+<span class="sd">            resultdict = m.match(&#39;/joe/sixpack&#39;)</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">url</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">environ</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">RoutesException</span><span class="p">(</span><span class="s1">&#39;URL or environ must be provided&#39;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">url</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">url</span> <span class="o">=</span> <span class="n">environ</span><span class="p">[</span><span class="s1">&#39;PATH_INFO&#39;</span><span class="p">]</span>
+
+        <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_match</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">environ</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">debug</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">result</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">result</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">result</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">result</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="nb">dict</span><span class="p">)</span> <span class="ow">or</span> <span class="n">result</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span>
+            <span class="k">return</span> <span class="n">result</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">return</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="Mapper.routematch">
+<a class="viewcode-back" href="../../routes.html#routes.Mapper.routematch">[documenti]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">routematch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">environ</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Match a URL against against one of the routes contained.</span>
+
+<span class="sd">        Will return None if no valid match is found, otherwise a</span>
+<span class="sd">        result dict and a route object is returned.</span>
+
+<span class="sd">        .. code-block:: python</span>
+
+<span class="sd">            resultdict, route_obj = m.match(&#39;/joe/sixpack&#39;)</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">url</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">environ</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">RoutesException</span><span class="p">(</span><span class="s1">&#39;URL or environ must be provided&#39;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">url</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">url</span> <span class="o">=</span> <span class="n">environ</span><span class="p">[</span><span class="s1">&#39;PATH_INFO&#39;</span><span class="p">]</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_match</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">environ</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">debug</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">result</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">result</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">result</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">result</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="nb">dict</span><span class="p">)</span> <span class="ow">or</span> <span class="n">result</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span>
+            <span class="k">return</span> <span class="n">result</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">result</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">return</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="Mapper.generate">
+<a class="viewcode-back" href="../../routes.html#routes.Mapper.generate">[documenti]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">generate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Generate a route from a set of keywords</span>
+
+<span class="sd">        Returns the url text, or None if no URL could be generated.</span>
+
+<span class="sd">        .. code-block:: python</span>
+
+<span class="sd">            m.generate(controller=&#39;content&#39;,action=&#39;view&#39;,id=10)</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Generate ourself if we haven&#39;t already</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_created_gens</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_create_gens</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">append_slash</span><span class="p">:</span>
+            <span class="n">kargs</span><span class="p">[</span><span class="s1">&#39;_append_slash&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">explicit</span><span class="p">:</span>
+            <span class="k">if</span> <span class="s1">&#39;controller&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">kargs</span><span class="p">:</span>
+                <span class="n">kargs</span><span class="p">[</span><span class="s1">&#39;controller&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;content&#39;</span>
+            <span class="k">if</span> <span class="s1">&#39;action&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">kargs</span><span class="p">:</span>
+                <span class="n">kargs</span><span class="p">[</span><span class="s1">&#39;action&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;index&#39;</span>
+
+        <span class="n">environ</span> <span class="o">=</span> <span class="n">kargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;_environ&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">environ</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{}</span>
+        <span class="k">if</span> <span class="s1">&#39;SCRIPT_NAME&#39;</span> <span class="ow">in</span> <span class="n">environ</span><span class="p">:</span>
+            <span class="n">script_name</span> <span class="o">=</span> <span class="n">environ</span><span class="p">[</span><span class="s1">&#39;SCRIPT_NAME&#39;</span><span class="p">]</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">environ</span> <span class="ow">and</span> <span class="s1">&#39;SCRIPT_NAME&#39;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">environ</span><span class="p">:</span>
+            <span class="n">script_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s1">&#39;SCRIPT_NAME&#39;</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">script_name</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+        <span class="n">controller</span> <span class="o">=</span> <span class="n">kargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;controller&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">action</span> <span class="o">=</span> <span class="n">kargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;action&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+        <span class="c1"># If the URL didn&#39;t depend on the SCRIPT_NAME, we&#39;ll cache it</span>
+        <span class="c1"># keyed by just by kargs; otherwise we need to cache it with</span>
+        <span class="c1"># both SCRIPT_NAME and kargs:</span>
+        <span class="n">cache_key</span> <span class="o">=</span> <span class="n">six</span><span class="o">.</span><span class="n">text_type</span><span class="p">(</span><span class="n">args</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s1">&#39;utf8&#39;</span><span class="p">)</span> <span class="o">+</span> \
+            <span class="n">six</span><span class="o">.</span><span class="n">text_type</span><span class="p">(</span><span class="n">kargs</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s1">&#39;utf8&#39;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">urlcache</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">six</span><span class="o">.</span><span class="n">PY3</span><span class="p">:</span>
+                <span class="n">cache_key_script_name</span> <span class="o">=</span> <span class="sa">b</span><span class="s1">&#39;:&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">((</span><span class="n">script_name</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">),</span>
+                                                   <span class="n">cache_key</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">cache_key_script_name</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">%s</span><span class="s1">:</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">script_name</span><span class="p">,</span> <span class="n">cache_key</span><span class="p">)</span>
+
+            <span class="c1"># Check the url cache to see if it exists, use it if it does</span>
+            <span class="n">val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">urlcache</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">cache_key_script_name</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">val</span> <span class="o">!=</span> <span class="bp">self</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">val</span>
+
+        <span class="n">controller</span> <span class="o">=</span> <span class="n">as_unicode</span><span class="p">(</span><span class="n">controller</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">encoding</span><span class="p">)</span>
+        <span class="n">action</span> <span class="o">=</span> <span class="n">as_unicode</span><span class="p">(</span><span class="n">action</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">encoding</span><span class="p">)</span>
+
+        <span class="n">actionlist</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_gendict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">controller</span><span class="p">)</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_gendict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;*&#39;</span><span class="p">,</span> <span class="p">{})</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">actionlist</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">args</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="p">(</span><span class="n">keylist</span><span class="p">,</span> <span class="n">sortcache</span><span class="p">)</span> <span class="o">=</span> <span class="n">actionlist</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">action</span><span class="p">)</span> <span class="ow">or</span> \
+            <span class="n">actionlist</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;*&#39;</span><span class="p">,</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="p">{}))</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">keylist</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">args</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="n">keys</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">(</span><span class="n">kargs</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+        <span class="n">cacheset</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">cachekey</span> <span class="o">=</span> <span class="n">six</span><span class="o">.</span><span class="n">text_type</span><span class="p">(</span><span class="n">keys</span><span class="p">)</span>
+        <span class="n">cachelist</span> <span class="o">=</span> <span class="n">sortcache</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">cachekey</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">args</span><span class="p">:</span>
+            <span class="n">keylist</span> <span class="o">=</span> <span class="n">args</span>
+        <span class="k">elif</span> <span class="n">cachelist</span><span class="p">:</span>
+            <span class="n">keylist</span> <span class="o">=</span> <span class="n">cachelist</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">cacheset</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="n">newlist</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">route</span> <span class="ow">in</span> <span class="n">keylist</span><span class="p">:</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">route</span><span class="o">.</span><span class="n">minkeys</span> <span class="o">-</span> <span class="n">route</span><span class="o">.</span><span class="n">dotkeys</span> <span class="o">-</span> <span class="n">keys</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">newlist</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">route</span><span class="p">)</span>
+            <span class="n">keylist</span> <span class="o">=</span> <span class="n">newlist</span>
+
+            <span class="k">class</span><span class="w"> </span><span class="nc">KeySorter</span><span class="p">:</span>
+
+                <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">obj</span> <span class="o">=</span> <span class="n">obj</span>
+
+                <span class="k">def</span><span class="w"> </span><span class="fm">__lt__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+                    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_keysort</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">obj</span><span class="p">,</span> <span class="n">other</span><span class="o">.</span><span class="n">obj</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">0</span>
+
+                <span class="k">def</span><span class="w"> </span><span class="nf">_keysort</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
+<span class="w">                    </span><span class="sd">&quot;&quot;&quot;Sorts two sets of sets, to order them ideally for</span>
+<span class="sd">                    matching.&quot;&quot;&quot;</span>
+                    <span class="n">a</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">maxkeys</span>
+                    <span class="n">b</span> <span class="o">=</span> <span class="n">b</span><span class="o">.</span><span class="n">maxkeys</span>
+
+                    <span class="n">lendiffa</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">keys</span> <span class="o">^</span> <span class="n">a</span><span class="p">)</span>
+                    <span class="n">lendiffb</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">keys</span> <span class="o">^</span> <span class="n">b</span><span class="p">)</span>
+                    <span class="c1"># If they both match, don&#39;t switch them</span>
+                    <span class="k">if</span> <span class="n">lendiffa</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">lendiffb</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                        <span class="k">return</span> <span class="mi">0</span>
+
+                    <span class="c1"># First, if a matches exactly, use it</span>
+                    <span class="k">if</span> <span class="n">lendiffa</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                        <span class="k">return</span> <span class="o">-</span><span class="mi">1</span>
+
+                    <span class="c1"># Or b matches exactly, use it</span>
+                    <span class="k">if</span> <span class="n">lendiffb</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                        <span class="k">return</span> <span class="mi">1</span>
+
+                    <span class="c1"># Neither matches exactly, return the one with the most in</span>
+                    <span class="c1"># common</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compare</span><span class="p">(</span><span class="n">lendiffa</span><span class="p">,</span> <span class="n">lendiffb</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+                        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compare</span><span class="p">(</span><span class="n">lendiffa</span><span class="p">,</span> <span class="n">lendiffb</span><span class="p">)</span>
+
+                    <span class="c1"># Neither matches exactly, but if they both have just as</span>
+                    <span class="c1"># much in common</span>
+                    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">keys</span> <span class="o">&amp;</span> <span class="n">b</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">keys</span> <span class="o">&amp;</span> <span class="n">a</span><span class="p">):</span>
+                        <span class="c1"># Then we return the shortest of the two</span>
+                        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compare</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">a</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">b</span><span class="p">))</span>
+
+                    <span class="c1"># Otherwise, we return the one that has the most in common</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compare</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">keys</span> <span class="o">&amp;</span> <span class="n">b</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">keys</span> <span class="o">&amp;</span> <span class="n">a</span><span class="p">))</span>
+
+                <span class="k">def</span><span class="w"> </span><span class="nf">_compare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj1</span><span class="p">,</span> <span class="n">obj2</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="n">obj1</span> <span class="o">&lt;</span> <span class="n">obj2</span><span class="p">:</span>
+                        <span class="k">return</span> <span class="o">-</span><span class="mi">1</span>
+                    <span class="k">elif</span> <span class="n">obj1</span> <span class="o">&lt;</span> <span class="n">obj2</span><span class="p">:</span>
+                        <span class="k">return</span> <span class="mi">1</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="k">return</span> <span class="mi">0</span>
+
+            <span class="n">keylist</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="n">KeySorter</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">cacheset</span><span class="p">:</span>
+                <span class="n">sortcache</span><span class="p">[</span><span class="n">cachekey</span><span class="p">]</span> <span class="o">=</span> <span class="n">keylist</span>
+
+        <span class="c1"># Iterate through the keylist of sorted routes (or a single route if</span>
+        <span class="c1"># it was passed in explicitly for hardcoded named routes)</span>
+        <span class="k">for</span> <span class="n">route</span> <span class="ow">in</span> <span class="n">keylist</span><span class="p">:</span>
+            <span class="n">fail</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">route</span><span class="o">.</span><span class="n">hardcoded</span><span class="p">:</span>
+                <span class="n">kval</span> <span class="o">=</span> <span class="n">kargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">kval</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="n">kval</span> <span class="o">=</span> <span class="n">as_unicode</span><span class="p">(</span><span class="n">kval</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">encoding</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">kval</span> <span class="o">!=</span> <span class="n">route</span><span class="o">.</span><span class="n">defaults</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="ow">and</span> \
+                        <span class="ow">not</span> <span class="nb">callable</span><span class="p">(</span><span class="n">route</span><span class="o">.</span><span class="n">defaults</span><span class="p">[</span><span class="n">key</span><span class="p">]):</span>
+                    <span class="n">fail</span> <span class="o">=</span> <span class="kc">True</span>
+                    <span class="k">break</span>
+            <span class="k">if</span> <span class="n">fail</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">path</span> <span class="o">=</span> <span class="n">route</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span><span class="o">**</span><span class="n">kargs</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">path</span><span class="p">:</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">prefix</span><span class="p">:</span>
+                    <span class="n">path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">prefix</span> <span class="o">+</span> <span class="n">path</span>
+                <span class="n">external_static</span> <span class="o">=</span> <span class="n">route</span><span class="o">.</span><span class="n">static</span> <span class="ow">and</span> <span class="n">route</span><span class="o">.</span><span class="n">external</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">route</span><span class="o">.</span><span class="n">absolute</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">external_static</span><span class="p">:</span>
+                    <span class="n">path</span> <span class="o">=</span> <span class="n">script_name</span> <span class="o">+</span> <span class="n">path</span>
+                    <span class="n">key</span> <span class="o">=</span> <span class="n">cache_key_script_name</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">key</span> <span class="o">=</span> <span class="n">cache_key</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">urlcache</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">urlcache</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">path</span><span class="p">))</span>
+                <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">continue</span>
+        <span class="k">return</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="Mapper.resource">
+<a class="viewcode-back" href="../../routes.html#routes.Mapper.resource">[documenti]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">resource</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">member_name</span><span class="p">,</span> <span class="n">collection_name</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Generate routes for a controller resource</span>
+
+<span class="sd">        The member_name name should be the appropriate singular version</span>
+<span class="sd">        of the resource given your locale and used with members of the</span>
+<span class="sd">        collection. The collection_name name will be used to refer to</span>
+<span class="sd">        the resource collection methods and should be a plural version</span>
+<span class="sd">        of the member_name argument. By default, the member_name name</span>
+<span class="sd">        will also be assumed to map to a controller you create.</span>
+
+<span class="sd">        The concept of a web resource maps somewhat directly to &#39;CRUD&#39;</span>
+<span class="sd">        operations. The overlying things to keep in mind is that</span>
+<span class="sd">        mapping a resource is about handling creating, viewing, and</span>
+<span class="sd">        editing that resource.</span>
+
+<span class="sd">        All keyword arguments are optional.</span>
+
+<span class="sd">        ``controller``</span>
+<span class="sd">            If specified in the keyword args, the controller will be</span>
+<span class="sd">            the actual controller used, but the rest of the naming</span>
+<span class="sd">            conventions used for the route names and URL paths are</span>
+<span class="sd">            unchanged.</span>
+
+<span class="sd">        ``collection``</span>
+<span class="sd">            Additional action mappings used to manipulate/view the</span>
+<span class="sd">            entire set of resources provided by the controller.</span>
+
+<span class="sd">            Example::</span>
+
+<span class="sd">                map.resource(&#39;message&#39;, &#39;messages&#39;, collection={&#39;rss&#39;:&#39;GET&#39;})</span>
+<span class="sd">                # GET /message/rss (maps to the rss action)</span>
+<span class="sd">                # also adds named route &quot;rss_message&quot;</span>
+
+<span class="sd">        ``member``</span>
+<span class="sd">            Additional action mappings used to access an individual</span>
+<span class="sd">            &#39;member&#39; of this controllers resources.</span>
+
+<span class="sd">            Example::</span>
+
+<span class="sd">                map.resource(&#39;message&#39;, &#39;messages&#39;, member={&#39;mark&#39;:&#39;POST&#39;})</span>
+<span class="sd">                # POST /message/1/mark (maps to the mark action)</span>
+<span class="sd">                # also adds named route &quot;mark_message&quot;</span>
+
+<span class="sd">        ``new``</span>
+<span class="sd">            Action mappings that involve dealing with a new member in</span>
+<span class="sd">            the controller resources.</span>
+
+<span class="sd">            Example::</span>
+
+<span class="sd">                map.resource(&#39;message&#39;, &#39;messages&#39;, new={&#39;preview&#39;:&#39;POST&#39;})</span>
+<span class="sd">                # POST /message/new/preview (maps to the preview action)</span>
+<span class="sd">                # also adds a url named &quot;preview_new_message&quot;</span>
+
+<span class="sd">        ``path_prefix``</span>
+<span class="sd">            Prepends the URL path for the Route with the path_prefix</span>
+<span class="sd">            given. This is most useful for cases where you want to mix</span>
+<span class="sd">            resources or relations between resources.</span>
+
+<span class="sd">        ``name_prefix``</span>
+<span class="sd">            Perpends the route names that are generated with the</span>
+<span class="sd">            name_prefix given. Combined with the path_prefix option,</span>
+<span class="sd">            it&#39;s easy to generate route names and paths that represent</span>
+<span class="sd">            resources that are in relations.</span>
+
+<span class="sd">            Example::</span>
+
+<span class="sd">                map.resource(&#39;message&#39;, &#39;messages&#39;, controller=&#39;categories&#39;,</span>
+<span class="sd">                    path_prefix=&#39;/category/:category_id&#39;,</span>
+<span class="sd">                    name_prefix=&quot;category_&quot;)</span>
+<span class="sd">                # GET /category/7/message/1</span>
+<span class="sd">                # has named route &quot;category_message&quot;</span>
+
+<span class="sd">        ``requirements``</span>
+
+<span class="sd">           A dictionary that restricts the matching of a</span>
+<span class="sd">           variable. Can be used when matching variables with path_prefix.</span>
+
+<span class="sd">           Example::</span>
+
+<span class="sd">                map.resource(&#39;message&#39;, &#39;messages&#39;,</span>
+<span class="sd">                     path_prefix=&#39;{project_id}/&#39;,</span>
+<span class="sd">                     requirements={&quot;project_id&quot;: R&quot;\\d+&quot;})</span>
+<span class="sd">                # POST /01234/message</span>
+<span class="sd">                #    success, project_id is set to &quot;01234&quot;</span>
+<span class="sd">                # POST /foo/message</span>
+<span class="sd">                #    404 not found, won&#39;t be matched by this route</span>
+
+
+<span class="sd">        ``parent_resource``</span>
+<span class="sd">            A ``dict`` containing information about the parent</span>
+<span class="sd">            resource, for creating a nested resource. It should contain</span>
+<span class="sd">            the ``member_name`` and ``collection_name`` of the parent</span>
+<span class="sd">            resource. This ``dict`` will</span>
+<span class="sd">            be available via the associated ``Route`` object which can</span>
+<span class="sd">            be accessed during a request via</span>
+<span class="sd">            ``request.environ[&#39;routes.route&#39;]``</span>
+
+<span class="sd">            If ``parent_resource`` is supplied and ``path_prefix``</span>
+<span class="sd">            isn&#39;t, ``path_prefix`` will be generated from</span>
+<span class="sd">            ``parent_resource`` as</span>
+<span class="sd">            &quot;&lt;parent collection name&gt;/:&lt;parent member name&gt;_id&quot;.</span>
+
+<span class="sd">            If ``parent_resource`` is supplied and ``name_prefix``</span>
+<span class="sd">            isn&#39;t, ``name_prefix`` will be generated from</span>
+<span class="sd">            ``parent_resource`` as  &quot;&lt;parent member name&gt;_&quot;.</span>
+
+<span class="sd">            Example::</span>
+
+<span class="sd">                &gt;&gt;&gt; from routes.util import url_for</span>
+<span class="sd">                &gt;&gt;&gt; m = Mapper()</span>
+<span class="sd">                &gt;&gt;&gt; m.resource(&#39;location&#39;, &#39;locations&#39;,</span>
+<span class="sd">                ...            parent_resource=dict(member_name=&#39;region&#39;,</span>
+<span class="sd">                ...                                 collection_name=&#39;regions&#39;))</span>
+<span class="sd">                &gt;&gt;&gt; # path_prefix is &quot;regions/:region_id&quot;</span>
+<span class="sd">                &gt;&gt;&gt; # name prefix is &quot;region_&quot;</span>
+<span class="sd">                &gt;&gt;&gt; url_for(&#39;region_locations&#39;, region_id=13)</span>
+<span class="sd">                &#39;/regions/13/locations&#39;</span>
+<span class="sd">                &gt;&gt;&gt; url_for(&#39;region_new_location&#39;, region_id=13)</span>
+<span class="sd">                &#39;/regions/13/locations/new&#39;</span>
+<span class="sd">                &gt;&gt;&gt; url_for(&#39;region_location&#39;, region_id=13, id=60)</span>
+<span class="sd">                &#39;/regions/13/locations/60&#39;</span>
+<span class="sd">                &gt;&gt;&gt; url_for(&#39;region_edit_location&#39;, region_id=13, id=60)</span>
+<span class="sd">                &#39;/regions/13/locations/60/edit&#39;</span>
+
+<span class="sd">            Overriding generated ``path_prefix``::</span>
+
+<span class="sd">                &gt;&gt;&gt; m = Mapper()</span>
+<span class="sd">                &gt;&gt;&gt; m.resource(&#39;location&#39;, &#39;locations&#39;,</span>
+<span class="sd">                ...            parent_resource=dict(member_name=&#39;region&#39;,</span>
+<span class="sd">                ...                                 collection_name=&#39;regions&#39;),</span>
+<span class="sd">                ...            path_prefix=&#39;areas/:area_id&#39;)</span>
+<span class="sd">                &gt;&gt;&gt; # name prefix is &quot;region_&quot;</span>
+<span class="sd">                &gt;&gt;&gt; url_for(&#39;region_locations&#39;, area_id=51)</span>
+<span class="sd">                &#39;/areas/51/locations&#39;</span>
+
+<span class="sd">            Overriding generated ``name_prefix``::</span>
+
+<span class="sd">                &gt;&gt;&gt; m = Mapper()</span>
+<span class="sd">                &gt;&gt;&gt; m.resource(&#39;location&#39;, &#39;locations&#39;,</span>
+<span class="sd">                ...            parent_resource=dict(member_name=&#39;region&#39;,</span>
+<span class="sd">                ...                                 collection_name=&#39;regions&#39;),</span>
+<span class="sd">                ...            name_prefix=&#39;&#39;)</span>
+<span class="sd">                &gt;&gt;&gt; # path_prefix is &quot;regions/:region_id&quot;</span>
+<span class="sd">                &gt;&gt;&gt; url_for(&#39;locations&#39;, region_id=51)</span>
+<span class="sd">                &#39;/regions/51/locations&#39;</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">collection</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;collection&#39;</span><span class="p">,</span> <span class="p">{})</span>
+        <span class="n">member</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;member&#39;</span><span class="p">,</span> <span class="p">{})</span>
+        <span class="n">new</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;new&#39;</span><span class="p">,</span> <span class="p">{})</span>
+        <span class="n">path_prefix</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;path_prefix&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">name_prefix</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;name_prefix&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">parent_resource</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;parent_resource&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+        <span class="c1"># Generate ``path_prefix`` if ``path_prefix`` wasn&#39;t specified and</span>
+        <span class="c1"># ``parent_resource`` was. Likewise for ``name_prefix``. Make sure</span>
+        <span class="c1"># that ``path_prefix`` and ``name_prefix`` *always* take precedence if</span>
+        <span class="c1"># they are specified--in particular, we need to be careful when they</span>
+        <span class="c1"># are explicitly set to &quot;&quot;.</span>
+        <span class="k">if</span> <span class="n">parent_resource</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">path_prefix</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">path_prefix</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">%s</span><span class="s1">/:</span><span class="si">%s</span><span class="s1">_id&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">parent_resource</span><span class="p">[</span><span class="s1">&#39;collection_name&#39;</span><span class="p">],</span>
+                                             <span class="n">parent_resource</span><span class="p">[</span><span class="s1">&#39;member_name&#39;</span><span class="p">])</span>
+            <span class="k">if</span> <span class="n">name_prefix</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">name_prefix</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">%s</span><span class="s1">_&#39;</span> <span class="o">%</span> <span class="n">parent_resource</span><span class="p">[</span><span class="s1">&#39;member_name&#39;</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">path_prefix</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">path_prefix</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+            <span class="k">if</span> <span class="n">name_prefix</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">name_prefix</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+
+        <span class="c1"># Ensure the edit and new actions are in and GET</span>
+        <span class="n">member</span><span class="p">[</span><span class="s1">&#39;edit&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;GET&#39;</span>
+        <span class="n">new</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s1">&#39;new&#39;</span><span class="p">:</span> <span class="s1">&#39;GET&#39;</span><span class="p">})</span>
+
+        <span class="c1"># Make new dict&#39;s based off the old, except the old values become keys,</span>
+        <span class="c1"># and the old keys become items in a list as the value</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">swap</span><span class="p">(</span><span class="n">dct</span><span class="p">,</span> <span class="n">newdct</span><span class="p">):</span>
+<span class="w">            </span><span class="sd">&quot;&quot;&quot;Swap the keys and values in the dict, and uppercase the values</span>
+<span class="sd">            from the dict during the swap.&quot;&quot;&quot;</span>
+            <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">six</span><span class="o">.</span><span class="n">iteritems</span><span class="p">(</span><span class="n">dct</span><span class="p">):</span>
+                <span class="n">newdct</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">val</span><span class="o">.</span><span class="n">upper</span><span class="p">(),</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">newdct</span>
+        <span class="n">collection_methods</span> <span class="o">=</span> <span class="n">swap</span><span class="p">(</span><span class="n">collection</span><span class="p">,</span> <span class="p">{})</span>
+        <span class="n">member_methods</span> <span class="o">=</span> <span class="n">swap</span><span class="p">(</span><span class="n">member</span><span class="p">,</span> <span class="p">{})</span>
+        <span class="n">new_methods</span> <span class="o">=</span> <span class="n">swap</span><span class="p">(</span><span class="n">new</span><span class="p">,</span> <span class="p">{})</span>
+
+        <span class="c1"># Insert create, update, and destroy methods</span>
+        <span class="n">collection_methods</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s1">&#39;POST&#39;</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;create&#39;</span><span class="p">)</span>
+        <span class="n">member_methods</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s1">&#39;PUT&#39;</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;update&#39;</span><span class="p">)</span>
+        <span class="n">member_methods</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s1">&#39;DELETE&#39;</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;delete&#39;</span><span class="p">)</span>
+
+        <span class="c1"># If there&#39;s a path prefix option, use it with the controller</span>
+        <span class="n">controller</span> <span class="o">=</span> <span class="n">strip_slashes</span><span class="p">(</span><span class="n">collection_name</span><span class="p">)</span>
+        <span class="n">path_prefix</span> <span class="o">=</span> <span class="n">strip_slashes</span><span class="p">(</span><span class="n">path_prefix</span><span class="p">)</span>
+        <span class="n">path_prefix</span> <span class="o">=</span> <span class="s1">&#39;/&#39;</span> <span class="o">+</span> <span class="n">path_prefix</span>
+        <span class="k">if</span> <span class="n">path_prefix</span> <span class="ow">and</span> <span class="n">path_prefix</span> <span class="o">!=</span> <span class="s1">&#39;/&#39;</span><span class="p">:</span>
+            <span class="n">path</span> <span class="o">=</span> <span class="n">path_prefix</span> <span class="o">+</span> <span class="s1">&#39;/&#39;</span> <span class="o">+</span> <span class="n">controller</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">path</span> <span class="o">=</span> <span class="s1">&#39;/&#39;</span> <span class="o">+</span> <span class="n">controller</span>
+        <span class="n">collection_path</span> <span class="o">=</span> <span class="n">path</span>
+        <span class="n">new_path</span> <span class="o">=</span> <span class="n">path</span> <span class="o">+</span> <span class="s2">&quot;/new&quot;</span>
+        <span class="n">member_path</span> <span class="o">=</span> <span class="n">path</span> <span class="o">+</span> <span class="s2">&quot;/:(id)&quot;</span>
+
+        <span class="n">options</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;controller&#39;</span><span class="p">:</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;controller&#39;</span><span class="p">,</span> <span class="n">controller</span><span class="p">),</span>
+            <span class="s1">&#39;_member_name&#39;</span><span class="p">:</span> <span class="n">member_name</span><span class="p">,</span>
+            <span class="s1">&#39;_collection_name&#39;</span><span class="p">:</span> <span class="n">collection_name</span><span class="p">,</span>
+            <span class="s1">&#39;_parent_resource&#39;</span><span class="p">:</span> <span class="n">parent_resource</span><span class="p">,</span>
+            <span class="s1">&#39;_filter&#39;</span><span class="p">:</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;_filter&#39;</span><span class="p">)</span>
+        <span class="p">}</span>
+        <span class="k">if</span> <span class="s1">&#39;requirements&#39;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="n">options</span><span class="p">[</span><span class="s1">&#39;requirements&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;requirements&#39;</span><span class="p">]</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">requirements_for</span><span class="p">(</span><span class="n">meth</span><span class="p">):</span>
+<span class="w">            </span><span class="sd">&quot;&quot;&quot;Returns a new dict to be used for all route creation as the</span>
+<span class="sd">            route options&quot;&quot;&quot;</span>
+            <span class="n">opts</span> <span class="o">=</span> <span class="n">options</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">method</span> <span class="o">!=</span> <span class="s1">&#39;any&#39;</span><span class="p">:</span>
+                <span class="n">opts</span><span class="p">[</span><span class="s1">&#39;conditions&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;method&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">meth</span><span class="o">.</span><span class="n">upper</span><span class="p">()]}</span>
+            <span class="k">return</span> <span class="n">opts</span>
+
+        <span class="c1"># Add the routes for handling collection methods</span>
+        <span class="k">for</span> <span class="n">method</span><span class="p">,</span> <span class="n">lst</span> <span class="ow">in</span> <span class="n">six</span><span class="o">.</span><span class="n">iteritems</span><span class="p">(</span><span class="n">collection_methods</span><span class="p">):</span>
+            <span class="n">primary</span> <span class="o">=</span> <span class="p">(</span><span class="n">method</span> <span class="o">!=</span> <span class="s1">&#39;GET&#39;</span> <span class="ow">and</span> <span class="n">lst</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="mi">0</span><span class="p">))</span> <span class="ow">or</span> <span class="kc">None</span>
+            <span class="n">route_options</span> <span class="o">=</span> <span class="n">requirements_for</span><span class="p">(</span><span class="n">method</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">action</span> <span class="ow">in</span> <span class="n">lst</span><span class="p">:</span>
+                <span class="n">route_options</span><span class="p">[</span><span class="s1">&#39;action&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">action</span>
+                <span class="n">route_name</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%s%s</span><span class="s2">_</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">name_prefix</span><span class="p">,</span> <span class="n">action</span><span class="p">,</span> <span class="n">collection_name</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s2">&quot;formatted_&quot;</span> <span class="o">+</span> <span class="n">route_name</span><span class="p">,</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">/</span><span class="si">%s</span><span class="s2">.:(format)&quot;</span> <span class="o">%</span>
+                             <span class="p">(</span><span class="n">collection_path</span><span class="p">,</span> <span class="n">action</span><span class="p">),</span> <span class="o">**</span><span class="n">route_options</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">route_name</span><span class="p">,</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">/</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">collection_path</span><span class="p">,</span> <span class="n">action</span><span class="p">),</span>
+                             <span class="o">**</span><span class="n">route_options</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">primary</span><span class="p">:</span>
+                <span class="n">route_options</span><span class="p">[</span><span class="s1">&#39;action&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">primary</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">.:(format)&quot;</span> <span class="o">%</span> <span class="n">collection_path</span><span class="p">,</span> <span class="o">**</span><span class="n">route_options</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">collection_path</span><span class="p">,</span> <span class="o">**</span><span class="n">route_options</span><span class="p">)</span>
+
+        <span class="c1"># Specifically add in the built-in &#39;index&#39; collection method and its</span>
+        <span class="c1"># formatted version</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s2">&quot;formatted_&quot;</span> <span class="o">+</span> <span class="n">name_prefix</span> <span class="o">+</span> <span class="n">collection_name</span><span class="p">,</span>
+                     <span class="n">collection_path</span> <span class="o">+</span> <span class="s2">&quot;.:(format)&quot;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s1">&#39;index&#39;</span><span class="p">,</span>
+                     <span class="n">conditions</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;method&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;GET&#39;</span><span class="p">]},</span> <span class="o">**</span><span class="n">options</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">name_prefix</span> <span class="o">+</span> <span class="n">collection_name</span><span class="p">,</span> <span class="n">collection_path</span><span class="p">,</span>
+                     <span class="n">action</span><span class="o">=</span><span class="s1">&#39;index&#39;</span><span class="p">,</span> <span class="n">conditions</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;method&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;GET&#39;</span><span class="p">]},</span> <span class="o">**</span><span class="n">options</span><span class="p">)</span>
+
+        <span class="c1"># Add the routes that deal with new resource methods</span>
+        <span class="k">for</span> <span class="n">method</span><span class="p">,</span> <span class="n">lst</span> <span class="ow">in</span> <span class="n">six</span><span class="o">.</span><span class="n">iteritems</span><span class="p">(</span><span class="n">new_methods</span><span class="p">):</span>
+            <span class="n">route_options</span> <span class="o">=</span> <span class="n">requirements_for</span><span class="p">(</span><span class="n">method</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">action</span> <span class="ow">in</span> <span class="n">lst</span><span class="p">:</span>
+                <span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;new_&quot;</span> <span class="o">+</span> <span class="n">member_name</span>
+                <span class="n">route_options</span><span class="p">[</span><span class="s1">&#39;action&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">action</span>
+                <span class="k">if</span> <span class="n">action</span> <span class="o">==</span> <span class="s1">&#39;new&#39;</span><span class="p">:</span>
+                    <span class="n">path</span> <span class="o">=</span> <span class="n">new_path</span>
+                    <span class="n">formatted_path</span> <span class="o">=</span> <span class="n">new_path</span> <span class="o">+</span> <span class="s1">&#39;.:(format)&#39;</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">path</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">/</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">new_path</span><span class="p">,</span> <span class="n">action</span><span class="p">)</span>
+                    <span class="n">name</span> <span class="o">=</span> <span class="n">action</span> <span class="o">+</span> <span class="s2">&quot;_&quot;</span> <span class="o">+</span> <span class="n">name</span>
+                    <span class="n">formatted_path</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">/</span><span class="si">%s</span><span class="s2">.:(format)&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">new_path</span><span class="p">,</span> <span class="n">action</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s2">&quot;formatted_&quot;</span> <span class="o">+</span> <span class="n">name_prefix</span> <span class="o">+</span> <span class="n">name</span><span class="p">,</span> <span class="n">formatted_path</span><span class="p">,</span>
+                             <span class="o">**</span><span class="n">route_options</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">name_prefix</span> <span class="o">+</span> <span class="n">name</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="o">**</span><span class="n">route_options</span><span class="p">)</span>
+
+        <span class="n">requirements_regexp</span> <span class="o">=</span> <span class="s1">&#39;[^</span><span class="se">\\</span><span class="s1">/]+(?&lt;!</span><span class="se">\\\\</span><span class="s1">)&#39;</span>
+
+        <span class="c1"># Add the routes that deal with member methods of a resource</span>
+        <span class="k">for</span> <span class="n">method</span><span class="p">,</span> <span class="n">lst</span> <span class="ow">in</span> <span class="n">six</span><span class="o">.</span><span class="n">iteritems</span><span class="p">(</span><span class="n">member_methods</span><span class="p">):</span>
+            <span class="n">route_options</span> <span class="o">=</span> <span class="n">requirements_for</span><span class="p">(</span><span class="n">method</span><span class="p">)</span>
+            <span class="n">route_options</span><span class="p">[</span><span class="s1">&#39;requirements&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;id&#39;</span><span class="p">:</span> <span class="n">requirements_regexp</span><span class="p">}</span>
+            <span class="k">if</span> <span class="n">method</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;POST&#39;</span><span class="p">,</span> <span class="s1">&#39;GET&#39;</span><span class="p">,</span> <span class="s1">&#39;any&#39;</span><span class="p">]:</span>
+                <span class="n">primary</span> <span class="o">=</span> <span class="n">lst</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">primary</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">for</span> <span class="n">action</span> <span class="ow">in</span> <span class="n">lst</span><span class="p">:</span>
+                <span class="n">route_options</span><span class="p">[</span><span class="s1">&#39;action&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">action</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s2">&quot;formatted_</span><span class="si">%s%s</span><span class="s2">_</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">name_prefix</span><span class="p">,</span> <span class="n">action</span><span class="p">,</span>
+                                                    <span class="n">member_name</span><span class="p">),</span>
+                             <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">/</span><span class="si">%s</span><span class="s2">.:(format)&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">member_path</span><span class="p">,</span> <span class="n">action</span><span class="p">),</span>
+                             <span class="o">**</span><span class="n">route_options</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s%s</span><span class="s2">_</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">name_prefix</span><span class="p">,</span> <span class="n">action</span><span class="p">,</span> <span class="n">member_name</span><span class="p">),</span>
+                             <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">/</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">member_path</span><span class="p">,</span> <span class="n">action</span><span class="p">),</span> <span class="o">**</span><span class="n">route_options</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">primary</span><span class="p">:</span>
+                <span class="n">route_options</span><span class="p">[</span><span class="s1">&#39;action&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">primary</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">.:(format)&quot;</span> <span class="o">%</span> <span class="n">member_path</span><span class="p">,</span> <span class="o">**</span><span class="n">route_options</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">member_path</span><span class="p">,</span> <span class="o">**</span><span class="n">route_options</span><span class="p">)</span>
+
+        <span class="c1"># Specifically add the member &#39;show&#39; method</span>
+        <span class="n">route_options</span> <span class="o">=</span> <span class="n">requirements_for</span><span class="p">(</span><span class="s1">&#39;GET&#39;</span><span class="p">)</span>
+        <span class="n">route_options</span><span class="p">[</span><span class="s1">&#39;action&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;show&#39;</span>
+        <span class="n">route_options</span><span class="p">[</span><span class="s1">&#39;requirements&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;id&#39;</span><span class="p">:</span> <span class="n">requirements_regexp</span><span class="p">}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s2">&quot;formatted_&quot;</span> <span class="o">+</span> <span class="n">name_prefix</span> <span class="o">+</span> <span class="n">member_name</span><span class="p">,</span>
+                     <span class="n">member_path</span> <span class="o">+</span> <span class="s2">&quot;.:(format)&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">route_options</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">name_prefix</span> <span class="o">+</span> <span class="n">member_name</span><span class="p">,</span> <span class="n">member_path</span><span class="p">,</span> <span class="o">**</span><span class="n">route_options</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Mapper.redirect">
+<a class="viewcode-back" href="../../routes.html#routes.Mapper.redirect">[documenti]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">redirect</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">match_path</span><span class="p">,</span> <span class="n">destination_path</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Add a redirect route to the mapper</span>
+
+<span class="sd">        Redirect routes bypass the wrapped WSGI application and instead</span>
+<span class="sd">        result in a redirect being issued by the RoutesMiddleware. As</span>
+<span class="sd">        such, this method is only meaningful when using</span>
+<span class="sd">        RoutesMiddleware.</span>
+
+<span class="sd">        By default, a 302 Found status code is used, this can be</span>
+<span class="sd">        changed by providing a ``_redirect_code`` keyword argument</span>
+<span class="sd">        which will then be used instead. Note that the entire status</span>
+<span class="sd">        code string needs to be present.</span>
+
+<span class="sd">        When using keyword arguments, all arguments that apply to</span>
+<span class="sd">        matching will be used for the match, while generation specific</span>
+<span class="sd">        options will be used during generation. Thus all options</span>
+<span class="sd">        normally available to connected Routes may be used with</span>
+<span class="sd">        redirect routes as well.</span>
+
+<span class="sd">        Example::</span>
+
+<span class="sd">            map = Mapper()</span>
+<span class="sd">            map.redirect(&#39;/legacyapp/archives/{url:.*}&#39;, &#39;/archives/{url}&#39;)</span>
+<span class="sd">            map.redirect(&#39;/home/index&#39;, &#39;/&#39;,</span>
+<span class="sd">                         _redirect_code=&#39;301 Moved Permanently&#39;)</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">both_args</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;_encoding&#39;</span><span class="p">,</span> <span class="s1">&#39;_explicit&#39;</span><span class="p">,</span> <span class="s1">&#39;_minimize&#39;</span><span class="p">]</span>
+        <span class="n">gen_args</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;_filter&#39;</span><span class="p">]</span>
+
+        <span class="n">status_code</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;_redirect_code&#39;</span><span class="p">,</span> <span class="s1">&#39;302 Found&#39;</span><span class="p">)</span>
+        <span class="n">gen_dict</span><span class="p">,</span> <span class="n">match_dict</span> <span class="o">=</span> <span class="p">{},</span> <span class="p">{}</span>
+
+        <span class="c1"># Create the dict of args for the generation route</span>
+        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">both_args</span> <span class="o">+</span> <span class="n">gen_args</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+                <span class="n">gen_dict</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+        <span class="n">gen_dict</span><span class="p">[</span><span class="s1">&#39;_static&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+
+        <span class="c1"># Create the dict of args for the matching route</span>
+        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">gen_args</span><span class="p">:</span>
+                <span class="n">match_dict</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">match_path</span><span class="p">,</span> <span class="o">**</span><span class="n">match_dict</span><span class="p">)</span>
+        <span class="n">match_route</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">matchlist</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s1">&#39;_redirect_</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="nb">id</span><span class="p">(</span><span class="n">match_route</span><span class="p">),</span> <span class="n">destination_path</span><span class="p">,</span>
+                     <span class="o">**</span><span class="n">gen_dict</span><span class="p">)</span>
+        <span class="n">match_route</span><span class="o">.</span><span class="n">redirect</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">match_route</span><span class="o">.</span><span class="n">redirect_status</span> <span class="o">=</span> <span class="n">status_code</span></div>
+</div>
+
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">prokect_work_mp</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Vai" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigazione</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">server</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Codice del modulo</a><ul>
+  <li><a href="../routes.html">routes</a><ul>
+  </ul></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2025, manfredi_piraino.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.1.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

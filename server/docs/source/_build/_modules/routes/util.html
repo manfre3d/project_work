@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+
+<html lang="it" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>routes.util &#8212; Documentazione prokect_work_mp 1.0 </title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../../_static/basic.css?v=686e5160" />
+    <link rel="stylesheet" type="text/css" href="../../_static/alabaster.css?v=27fed22d" />
+    <script src="../../_static/documentation_options.js?v=945aedf1"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/translations.js?v=45930005"></script>
+    <link rel="index" title="Indice" href="../../genindex.html" />
+    <link rel="search" title="Cerca" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Codice sorgente per routes.util</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Utility functions for use in templates / controllers</span>
+
+<span class="sd">*PLEASE NOTE*: Many of these functions expect an initialized RequestConfig</span>
+<span class="sd">object. This is expected to have been initialized for EACH REQUEST by the web</span>
+<span class="sd">framework.</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">six</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">six.moves</span><span class="w"> </span><span class="kn">import</span> <span class="n">urllib</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">routes</span><span class="w"> </span><span class="kn">import</span> <span class="n">request_config</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">RoutesException</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Tossed during Route exceptions&quot;&quot;&quot;</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">MatchException</span><span class="p">(</span><span class="n">RoutesException</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Tossed during URL matching exceptions&quot;&quot;&quot;</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">GenerationException</span><span class="p">(</span><span class="n">RoutesException</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Tossed during URL generation exceptions&quot;&quot;&quot;</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_screenargs</span><span class="p">(</span><span class="n">kargs</span><span class="p">,</span> <span class="n">mapper</span><span class="p">,</span> <span class="n">environ</span><span class="p">,</span> <span class="n">force_explicit</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Private function that takes a dict, and screens it against the current</span>
+<span class="sd">    request dict to determine what the dict should look like that is used.</span>
+<span class="sd">    This is responsible for the requests &quot;memory&quot; of the current.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Coerce any unicode args with the encoding</span>
+    <span class="n">encoding</span> <span class="o">=</span> <span class="n">mapper</span><span class="o">.</span><span class="n">encoding</span>
+    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">six</span><span class="o">.</span><span class="n">iteritems</span><span class="p">(</span><span class="n">kargs</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="n">six</span><span class="o">.</span><span class="n">text_type</span><span class="p">):</span>
+            <span class="n">kargs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">val</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">encoding</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">mapper</span><span class="o">.</span><span class="n">explicit</span> <span class="ow">and</span> <span class="n">mapper</span><span class="o">.</span><span class="n">sub_domains</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">force_explicit</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_subdomain_check</span><span class="p">(</span><span class="n">kargs</span><span class="p">,</span> <span class="n">mapper</span><span class="p">,</span> <span class="n">environ</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">mapper</span><span class="o">.</span><span class="n">explicit</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">force_explicit</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">kargs</span>
+
+    <span class="n">controller_name</span> <span class="o">=</span> <span class="n">as_unicode</span><span class="p">(</span><span class="n">kargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;controller&#39;</span><span class="p">),</span> <span class="n">encoding</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">controller_name</span> <span class="ow">and</span> <span class="n">controller_name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">):</span>
+        <span class="c1"># If the controller name starts with &#39;/&#39;, ignore route memory</span>
+        <span class="n">kargs</span><span class="p">[</span><span class="s1">&#39;controller&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">kargs</span><span class="p">[</span><span class="s1">&#39;controller&#39;</span><span class="p">][</span><span class="mi">1</span><span class="p">:]</span>
+        <span class="k">return</span> <span class="n">kargs</span>
+    <span class="k">elif</span> <span class="n">controller_name</span> <span class="ow">and</span> <span class="s1">&#39;action&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">kargs</span><span class="p">:</span>
+        <span class="c1"># Fill in an action if we don&#39;t have one, but have a controller</span>
+        <span class="n">kargs</span><span class="p">[</span><span class="s1">&#39;action&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;index&#39;</span>
+
+    <span class="n">route_args</span> <span class="o">=</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;wsgiorg.routing_args&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">route_args</span><span class="p">:</span>
+        <span class="n">memory_kargs</span> <span class="o">=</span> <span class="n">route_args</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">memory_kargs</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="c1"># Remove keys from memory and kargs if kargs has them as None</span>
+    <span class="n">empty_keys</span> <span class="o">=</span> <span class="p">[</span><span class="n">key</span> <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">six</span><span class="o">.</span><span class="n">iteritems</span><span class="p">(</span><span class="n">kargs</span><span class="p">)</span> <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">empty_keys</span><span class="p">:</span>
+        <span class="k">del</span> <span class="n">kargs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+        <span class="n">memory_kargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+    <span class="c1"># Merge the new args on top of the memory args</span>
+    <span class="n">memory_kargs</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">kargs</span><span class="p">)</span>
+
+    <span class="c1"># Setup a sub-domain if applicable</span>
+    <span class="k">if</span> <span class="n">mapper</span><span class="o">.</span><span class="n">sub_domains</span><span class="p">:</span>
+        <span class="n">memory_kargs</span> <span class="o">=</span> <span class="n">_subdomain_check</span><span class="p">(</span><span class="n">memory_kargs</span><span class="p">,</span> <span class="n">mapper</span><span class="p">,</span> <span class="n">environ</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">memory_kargs</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_subdomain_check</span><span class="p">(</span><span class="n">kargs</span><span class="p">,</span> <span class="n">mapper</span><span class="p">,</span> <span class="n">environ</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Screen the kargs for a subdomain and alter it appropriately depending</span>
+<span class="sd">    on the current subdomain or lack therof.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">mapper</span><span class="o">.</span><span class="n">sub_domains</span><span class="p">:</span>
+        <span class="n">subdomain</span> <span class="o">=</span> <span class="n">kargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;sub_domain&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">subdomain</span><span class="p">,</span> <span class="n">six</span><span class="o">.</span><span class="n">text_type</span><span class="p">):</span>
+            <span class="n">subdomain</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">subdomain</span><span class="p">)</span>
+
+        <span class="n">fullhost</span> <span class="o">=</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;HTTP_HOST&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;SERVER_NAME&#39;</span><span class="p">)</span>
+
+        <span class="c1"># In case environ defaulted to {}</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">fullhost</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">kargs</span>
+
+        <span class="n">hostmatch</span> <span class="o">=</span> <span class="n">fullhost</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;:&#39;</span><span class="p">)</span>
+        <span class="n">host</span> <span class="o">=</span> <span class="n">hostmatch</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">port</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">hostmatch</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">port</span> <span class="o">+=</span> <span class="s1">&#39;:&#39;</span> <span class="o">+</span> <span class="n">hostmatch</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="n">match</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;^(.+?)\.(</span><span class="si">%s</span><span class="s1">)$&#39;</span> <span class="o">%</span> <span class="n">mapper</span><span class="o">.</span><span class="n">domain_match</span><span class="p">,</span> <span class="n">host</span><span class="p">)</span>
+        <span class="n">host_subdomain</span><span class="p">,</span> <span class="n">domain</span> <span class="o">=</span> <span class="n">match</span><span class="o">.</span><span class="n">groups</span><span class="p">()</span> <span class="k">if</span> <span class="n">match</span> <span class="k">else</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="n">host</span><span class="p">)</span>
+
+        <span class="n">subdomain</span> <span class="o">=</span> <span class="n">as_unicode</span><span class="p">(</span><span class="n">subdomain</span><span class="p">,</span> <span class="n">mapper</span><span class="o">.</span><span class="n">encoding</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">subdomain</span> <span class="ow">and</span> <span class="n">host_subdomain</span> <span class="o">!=</span> <span class="n">subdomain</span> <span class="ow">and</span> \
+            <span class="n">subdomain</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">mapper</span><span class="o">.</span><span class="n">sub_domains_ignore</span><span class="p">:</span>
+            <span class="n">kargs</span><span class="p">[</span><span class="s1">&#39;_host&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">subdomain</span> <span class="o">+</span> <span class="s1">&#39;.&#39;</span> <span class="o">+</span> <span class="n">domain</span> <span class="o">+</span> <span class="n">port</span>
+        <span class="k">elif</span> <span class="p">(</span><span class="n">subdomain</span> <span class="ow">in</span> <span class="n">mapper</span><span class="o">.</span><span class="n">sub_domains_ignore</span> <span class="ow">or</span> \
+            <span class="n">subdomain</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">and</span> <span class="n">domain</span> <span class="o">!=</span> <span class="n">host</span><span class="p">:</span>
+            <span class="n">kargs</span><span class="p">[</span><span class="s1">&#39;_host&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">domain</span> <span class="o">+</span> <span class="n">port</span>
+        <span class="k">return</span> <span class="n">kargs</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">kargs</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_url_quote</span><span class="p">(</span><span class="n">string</span><span class="p">,</span> <span class="n">encoding</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A Unicode handling version of urllib.quote.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">encoding</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">string</span><span class="p">,</span> <span class="n">six</span><span class="o">.</span><span class="n">text_type</span><span class="p">):</span>
+            <span class="n">s</span> <span class="o">=</span> <span class="n">string</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">encoding</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">string</span><span class="p">,</span> <span class="n">six</span><span class="o">.</span><span class="n">text_type</span><span class="p">):</span>
+            <span class="c1"># assume the encoding is already correct</span>
+            <span class="n">s</span> <span class="o">=</span> <span class="n">string</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">s</span> <span class="o">=</span> <span class="n">six</span><span class="o">.</span><span class="n">text_type</span><span class="p">(</span><span class="n">string</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">encoding</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">s</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">string</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">urllib</span><span class="o">.</span><span class="n">parse</span><span class="o">.</span><span class="n">quote</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="s1">&#39;/&#39;</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_str_encode</span><span class="p">(</span><span class="n">string</span><span class="p">,</span> <span class="n">encoding</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">encoding</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">string</span><span class="p">,</span> <span class="n">six</span><span class="o">.</span><span class="n">text_type</span><span class="p">):</span>
+            <span class="n">s</span> <span class="o">=</span> <span class="n">string</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">encoding</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">string</span><span class="p">,</span> <span class="n">six</span><span class="o">.</span><span class="n">text_type</span><span class="p">):</span>
+            <span class="c1"># assume the encoding is already correct</span>
+            <span class="n">s</span> <span class="o">=</span> <span class="n">string</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">s</span> <span class="o">=</span> <span class="n">six</span><span class="o">.</span><span class="n">text_type</span><span class="p">(</span><span class="n">string</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">encoding</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">s</span>
+
+
+<div class="viewcode-block" id="url_for">
+<a class="viewcode-back" href="../../routes.html#routes.url_for">[documenti]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">url_for</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kargs</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Generates a URL</span>
+
+<span class="sd">    All keys given to url_for are sent to the Routes Mapper instance for</span>
+<span class="sd">    generation except for::</span>
+
+<span class="sd">        anchor          specified the anchor name to be appened to the path</span>
+<span class="sd">        host            overrides the default (current) host if provided</span>
+<span class="sd">        protocol        overrides the default (current) protocol if provided</span>
+<span class="sd">        qualified       creates the URL with the host/port information as</span>
+<span class="sd">                        needed</span>
+
+<span class="sd">    The URL is generated based on the rest of the keys. When generating a new</span>
+<span class="sd">    URL, values will be used from the current request&#39;s parameters (if</span>
+<span class="sd">    present). The following rules are used to determine when and how to keep</span>
+<span class="sd">    the current requests parameters:</span>
+
+<span class="sd">    * If the controller is present and begins with &#39;/&#39;, no defaults are used</span>
+<span class="sd">    * If the controller is changed, action is set to &#39;index&#39; unless otherwise</span>
+<span class="sd">      specified</span>
+
+<span class="sd">    For example, if the current request yielded a dict of</span>
+<span class="sd">    {&#39;controller&#39;: &#39;blog&#39;, &#39;action&#39;: &#39;view&#39;, &#39;id&#39;: 2}, with the standard</span>
+<span class="sd">    &#39;:controller/:action/:id&#39; route, you&#39;d get the following results::</span>
+
+<span class="sd">        url_for(id=4)                    =&gt;  &#39;/blog/view/4&#39;,</span>
+<span class="sd">        url_for(controller=&#39;/admin&#39;)     =&gt;  &#39;/admin&#39;,</span>
+<span class="sd">        url_for(controller=&#39;admin&#39;)      =&gt;  &#39;/admin/view/2&#39;</span>
+<span class="sd">        url_for(action=&#39;edit&#39;)           =&gt;  &#39;/blog/edit/2&#39;,</span>
+<span class="sd">        url_for(action=&#39;list&#39;, id=None)  =&gt;  &#39;/blog/list&#39;</span>
+
+<span class="sd">    **Static and Named Routes**</span>
+
+<span class="sd">    If there is a string present as the first argument, a lookup is done</span>
+<span class="sd">    against the named routes table to see if there&#39;s any matching routes. The</span>
+<span class="sd">    keyword defaults used with static routes will be sent in as GET query</span>
+<span class="sd">    arg&#39;s if a route matches.</span>
+
+<span class="sd">    If no route by that name is found, the string is assumed to be a raw URL.</span>
+<span class="sd">    Should the raw URL begin with ``/`` then appropriate SCRIPT_NAME data will</span>
+<span class="sd">    be added if present, otherwise the string will be used as the url with</span>
+<span class="sd">    keyword args becoming GET query args.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">anchor</span> <span class="o">=</span> <span class="n">kargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;anchor&#39;</span><span class="p">)</span>
+    <span class="n">host</span> <span class="o">=</span> <span class="n">kargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;host&#39;</span><span class="p">)</span>
+    <span class="n">protocol</span> <span class="o">=</span> <span class="n">kargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;protocol&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">qualified</span> <span class="o">=</span> <span class="n">kargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;qualified&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+    <span class="c1"># Remove special words from kargs, convert placeholders</span>
+    <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;anchor&#39;</span><span class="p">,</span> <span class="s1">&#39;host&#39;</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="n">kargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">):</span>
+            <span class="k">del</span> <span class="n">kargs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">key</span><span class="o">+</span><span class="s1">&#39;_&#39;</span> <span class="ow">in</span> <span class="n">kargs</span><span class="p">:</span>
+            <span class="n">kargs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">kargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">key</span><span class="o">+</span><span class="s1">&#39;_&#39;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="s1">&#39;protocol_&#39;</span> <span class="ow">in</span> <span class="n">kargs</span><span class="p">:</span>
+        <span class="n">kargs</span><span class="p">[</span><span class="s1">&#39;protocol_&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">protocol</span>
+
+    <span class="n">config</span> <span class="o">=</span> <span class="n">request_config</span><span class="p">()</span>
+    <span class="n">route</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">static</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">encoding</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">mapper</span><span class="o">.</span><span class="n">encoding</span>
+    <span class="n">url</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">route</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">mapper</span><span class="o">.</span><span class="n">_routenames</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+        <span class="c1"># No named route found, assume the argument is a relative path</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">route</span><span class="p">:</span>
+            <span class="n">static</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="n">url</span> <span class="o">=</span> <span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">url</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s1">&#39;environ&#39;</span><span class="p">)</span> \
+                <span class="ow">and</span> <span class="n">config</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;SCRIPT_NAME&#39;</span><span class="p">):</span>
+            <span class="n">url</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;SCRIPT_NAME&#39;</span><span class="p">)</span> <span class="o">+</span> <span class="n">url</span>
+
+        <span class="k">if</span> <span class="n">static</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">kargs</span><span class="p">:</span>
+                <span class="n">url</span> <span class="o">+=</span> <span class="s1">&#39;?&#39;</span>
+                <span class="n">query_args</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">six</span><span class="o">.</span><span class="n">iteritems</span><span class="p">(</span><span class="n">kargs</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)):</span>
+                        <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">val</span><span class="p">:</span>
+                            <span class="n">query_args</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">=</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
+                                <span class="n">urllib</span><span class="o">.</span><span class="n">parse</span><span class="o">.</span><span class="n">quote</span><span class="p">(</span><span class="n">six</span><span class="o">.</span><span class="n">text_type</span><span class="p">(</span><span class="n">key</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">encoding</span><span class="p">)),</span>
+                                <span class="n">urllib</span><span class="o">.</span><span class="n">parse</span><span class="o">.</span><span class="n">quote</span><span class="p">(</span><span class="n">six</span><span class="o">.</span><span class="n">text_type</span><span class="p">(</span><span class="n">value</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">encoding</span><span class="p">))))</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">query_args</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">=</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
+                            <span class="n">urllib</span><span class="o">.</span><span class="n">parse</span><span class="o">.</span><span class="n">quote</span><span class="p">(</span><span class="n">six</span><span class="o">.</span><span class="n">text_type</span><span class="p">(</span><span class="n">key</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">encoding</span><span class="p">)),</span>
+                            <span class="n">urllib</span><span class="o">.</span><span class="n">parse</span><span class="o">.</span><span class="n">quote</span><span class="p">(</span><span class="n">six</span><span class="o">.</span><span class="n">text_type</span><span class="p">(</span><span class="n">val</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">encoding</span><span class="p">))))</span>
+                <span class="n">url</span> <span class="o">+=</span> <span class="s1">&#39;&amp;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">query_args</span><span class="p">)</span>
+    <span class="n">environ</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s1">&#39;environ&#39;</span><span class="p">,</span> <span class="p">{})</span>
+    <span class="k">if</span> <span class="s1">&#39;wsgiorg.routing_args&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">environ</span><span class="p">:</span>
+        <span class="n">environ</span> <span class="o">=</span> <span class="n">environ</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">mapper_dict</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s1">&#39;mapper_dict&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">mapper_dict</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">match_dict</span> <span class="o">=</span> <span class="n">mapper_dict</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">match_dict</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">environ</span><span class="p">[</span><span class="s1">&#39;wsgiorg.routing_args&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">((),</span> <span class="n">match_dict</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">static</span><span class="p">:</span>
+        <span class="n">route_args</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">if</span> <span class="n">route</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">mapper</span><span class="o">.</span><span class="n">hardcode_names</span><span class="p">:</span>
+                <span class="n">route_args</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">route</span><span class="p">)</span>
+            <span class="n">newargs</span> <span class="o">=</span> <span class="n">route</span><span class="o">.</span><span class="n">defaults</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+            <span class="n">newargs</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">kargs</span><span class="p">)</span>
+
+            <span class="c1"># If this route has a filter, apply it</span>
+            <span class="k">if</span> <span class="n">route</span><span class="o">.</span><span class="n">filter</span><span class="p">:</span>
+                <span class="n">newargs</span> <span class="o">=</span> <span class="n">route</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">newargs</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">route</span><span class="o">.</span><span class="n">static</span><span class="p">:</span>
+                <span class="c1"># Handle sub-domains</span>
+                <span class="n">newargs</span> <span class="o">=</span> <span class="n">_subdomain_check</span><span class="p">(</span><span class="n">newargs</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">mapper</span><span class="p">,</span> <span class="n">environ</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">newargs</span> <span class="o">=</span> <span class="n">_screenargs</span><span class="p">(</span><span class="n">kargs</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">mapper</span><span class="p">,</span> <span class="n">environ</span><span class="p">)</span>
+        <span class="n">anchor</span> <span class="o">=</span> <span class="n">newargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;_anchor&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">or</span> <span class="n">anchor</span>
+        <span class="n">host</span> <span class="o">=</span> <span class="n">newargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;_host&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">or</span> <span class="n">host</span>
+        <span class="n">protocol</span> <span class="o">=</span> <span class="n">newargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;_protocol&#39;</span><span class="p">,</span> <span class="n">protocol</span><span class="p">)</span>
+        <span class="n">url</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">mapper</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span><span class="o">*</span><span class="n">route_args</span><span class="p">,</span> <span class="o">**</span><span class="n">newargs</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">anchor</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">url</span> <span class="o">+=</span> <span class="s1">&#39;#&#39;</span> <span class="o">+</span> <span class="n">_url_quote</span><span class="p">(</span><span class="n">anchor</span><span class="p">,</span> <span class="n">encoding</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">host</span> <span class="ow">or</span> <span class="p">(</span><span class="n">protocol</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">or</span> <span class="n">qualified</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">host</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">qualified</span><span class="p">:</span>
+            <span class="c1"># Ensure we don&#39;t use a specific port, as changing the protocol</span>
+            <span class="c1"># means that we most likely need a new port</span>
+            <span class="n">host</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">host</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;:&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">elif</span> <span class="ow">not</span> <span class="n">host</span><span class="p">:</span>
+            <span class="n">host</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">host</span>
+        <span class="k">if</span> <span class="n">protocol</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">protocol</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">protocol</span>
+        <span class="k">if</span> <span class="n">protocol</span> <span class="o">!=</span> <span class="s1">&#39;&#39;</span><span class="p">:</span>
+            <span class="n">protocol</span> <span class="o">+=</span> <span class="s1">&#39;:&#39;</span>
+        <span class="k">if</span> <span class="n">url</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">url</span> <span class="o">=</span> <span class="n">protocol</span> <span class="o">+</span> <span class="s1">&#39;//&#39;</span> <span class="o">+</span> <span class="n">host</span> <span class="o">+</span> <span class="n">url</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">ascii_characters</span><span class="p">(</span><span class="n">url</span><span class="p">)</span> <span class="ow">and</span> <span class="n">url</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">GenerationException</span><span class="p">(</span><span class="s2">&quot;url_for can only return a string, got &quot;</span>
+                        <span class="s2">&quot;unicode instead: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">url</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">url</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">GenerationException</span><span class="p">(</span>
+            <span class="s2">&quot;url_for could not generate URL. Called with args: </span><span class="si">%s</span><span class="s2"> </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> \
+            <span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">kargs</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">url</span></div>
+
+
+
+<div class="viewcode-block" id="URLGenerator">
+<a class="viewcode-back" href="../../routes.html#routes.URLGenerator">[documenti]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">URLGenerator</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The URL Generator generates URL&#39;s</span>
+
+<span class="sd">    It is automatically instantiated by the RoutesMiddleware and put</span>
+<span class="sd">    into the ``wsgiorg.routing_args`` tuple accessible as::</span>
+
+<span class="sd">        url = environ[&#39;wsgiorg.routing_args&#39;][0][0]</span>
+
+<span class="sd">    Or via the ``routes.url`` key::</span>
+
+<span class="sd">        url = environ[&#39;routes.url&#39;]</span>
+
+<span class="sd">    The url object may be instantiated outside of a web context for use</span>
+<span class="sd">    in testing, however sub_domain support and fully qualified URL&#39;s</span>
+<span class="sd">    cannot be generated without supplying a dict that must contain the</span>
+<span class="sd">    key ``HTTP_HOST``.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mapper</span><span class="p">,</span> <span class="n">environ</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Instantiate the URLGenerator</span>
+
+<span class="sd">        ``mapper``</span>
+<span class="sd">            The mapper object to use when generating routes.</span>
+<span class="sd">        ``environ``</span>
+<span class="sd">            The environment dict used in WSGI, alternately, any dict</span>
+<span class="sd">            that contains at least an ``HTTP_HOST`` value.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mapper</span> <span class="o">=</span> <span class="n">mapper</span>
+        <span class="k">if</span> <span class="s1">&#39;SCRIPT_NAME&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">environ</span><span class="p">:</span>
+            <span class="n">environ</span><span class="p">[</span><span class="s1">&#39;SCRIPT_NAME&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">environ</span> <span class="o">=</span> <span class="n">environ</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Generates a URL</span>
+
+<span class="sd">        All keys given to url_for are sent to the Routes Mapper instance for</span>
+<span class="sd">        generation except for::</span>
+
+<span class="sd">            anchor          specified the anchor name to be appened to the path</span>
+<span class="sd">            host            overrides the default (current) host if provided</span>
+<span class="sd">            protocol        overrides the default (current) protocol if provided</span>
+<span class="sd">            qualified       creates the URL with the host/port information as</span>
+<span class="sd">                            needed</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">anchor</span> <span class="o">=</span> <span class="n">kargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;anchor&#39;</span><span class="p">)</span>
+        <span class="n">host</span> <span class="o">=</span> <span class="n">kargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;host&#39;</span><span class="p">)</span>
+        <span class="n">protocol</span> <span class="o">=</span> <span class="n">kargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;protocol&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">qualified</span> <span class="o">=</span> <span class="n">kargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;qualified&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+        <span class="c1"># Remove special words from kargs, convert placeholders</span>
+        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;anchor&#39;</span><span class="p">,</span> <span class="s1">&#39;host&#39;</span><span class="p">]:</span>
+            <span class="k">if</span> <span class="n">kargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">):</span>
+                <span class="k">del</span> <span class="n">kargs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">key</span><span class="o">+</span><span class="s1">&#39;_&#39;</span> <span class="ow">in</span> <span class="n">kargs</span><span class="p">:</span>
+                <span class="n">kargs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">kargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">key</span><span class="o">+</span><span class="s1">&#39;_&#39;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="s1">&#39;protocol_&#39;</span> <span class="ow">in</span> <span class="n">kargs</span><span class="p">:</span>
+            <span class="n">kargs</span><span class="p">[</span><span class="s1">&#39;protocol_&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">protocol</span>
+
+        <span class="n">route</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">use_current</span> <span class="o">=</span> <span class="s1">&#39;_use_current&#39;</span> <span class="ow">in</span> <span class="n">kargs</span> <span class="ow">and</span> <span class="n">kargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;_use_current&#39;</span><span class="p">)</span>
+
+        <span class="n">static</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">encoding</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mapper</span><span class="o">.</span><span class="n">encoding</span>
+        <span class="n">url</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+
+        <span class="n">more_args</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span>
+        <span class="k">if</span> <span class="n">more_args</span><span class="p">:</span>
+            <span class="n">route</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mapper</span><span class="o">.</span><span class="n">_routenames</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">route</span> <span class="ow">and</span> <span class="n">more_args</span><span class="p">:</span>
+            <span class="n">static</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="n">url</span> <span class="o">=</span> <span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">url</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;SCRIPT_NAME&#39;</span><span class="p">):</span>
+                <span class="n">url</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;SCRIPT_NAME&#39;</span><span class="p">)</span> <span class="o">+</span> <span class="n">url</span>
+
+            <span class="k">if</span> <span class="n">static</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">kargs</span><span class="p">:</span>
+                    <span class="n">url</span> <span class="o">+=</span> <span class="s1">&#39;?&#39;</span>
+                    <span class="n">query_args</span> <span class="o">=</span> <span class="p">[]</span>
+                    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">six</span><span class="o">.</span><span class="n">iteritems</span><span class="p">(</span><span class="n">kargs</span><span class="p">):</span>
+                        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)):</span>
+                            <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">val</span><span class="p">:</span>
+                                <span class="n">query_args</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">=</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
+                                    <span class="n">urllib</span><span class="o">.</span><span class="n">parse</span><span class="o">.</span><span class="n">quote</span><span class="p">(</span><span class="n">six</span><span class="o">.</span><span class="n">text_type</span><span class="p">(</span><span class="n">key</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">encoding</span><span class="p">)),</span>
+                                    <span class="n">urllib</span><span class="o">.</span><span class="n">parse</span><span class="o">.</span><span class="n">quote</span><span class="p">(</span><span class="n">six</span><span class="o">.</span><span class="n">text_type</span><span class="p">(</span><span class="n">value</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">encoding</span><span class="p">))))</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">query_args</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">=</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
+                                <span class="n">urllib</span><span class="o">.</span><span class="n">parse</span><span class="o">.</span><span class="n">quote</span><span class="p">(</span><span class="n">six</span><span class="o">.</span><span class="n">text_type</span><span class="p">(</span><span class="n">key</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">encoding</span><span class="p">)),</span>
+                                <span class="n">urllib</span><span class="o">.</span><span class="n">parse</span><span class="o">.</span><span class="n">quote</span><span class="p">(</span><span class="n">six</span><span class="o">.</span><span class="n">text_type</span><span class="p">(</span><span class="n">val</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">encoding</span><span class="p">))))</span>
+                    <span class="n">url</span> <span class="o">+=</span> <span class="s1">&#39;&amp;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">query_args</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">static</span><span class="p">:</span>
+            <span class="n">route_args</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">if</span> <span class="n">route</span><span class="p">:</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">mapper</span><span class="o">.</span><span class="n">hardcode_names</span><span class="p">:</span>
+                    <span class="n">route_args</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">route</span><span class="p">)</span>
+                <span class="n">newargs</span> <span class="o">=</span> <span class="n">route</span><span class="o">.</span><span class="n">defaults</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+                <span class="n">newargs</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">kargs</span><span class="p">)</span>
+
+                <span class="c1"># If this route has a filter, apply it</span>
+                <span class="k">if</span> <span class="n">route</span><span class="o">.</span><span class="n">filter</span><span class="p">:</span>
+                    <span class="n">newargs</span> <span class="o">=</span> <span class="n">route</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">newargs</span><span class="p">)</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">route</span><span class="o">.</span><span class="n">static</span> <span class="ow">or</span> <span class="p">(</span><span class="n">route</span><span class="o">.</span><span class="n">static</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">route</span><span class="o">.</span><span class="n">external</span><span class="p">):</span>
+                    <span class="c1"># Handle sub-domains, retain sub_domain if there is one</span>
+                    <span class="n">sub</span> <span class="o">=</span> <span class="n">newargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;sub_domain&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+                    <span class="n">newargs</span> <span class="o">=</span> <span class="n">_subdomain_check</span><span class="p">(</span><span class="n">newargs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">mapper</span><span class="p">,</span>
+                                               <span class="bp">self</span><span class="o">.</span><span class="n">environ</span><span class="p">)</span>
+                    <span class="c1"># If the route requires a sub-domain, and we have it, restore</span>
+                    <span class="c1"># it</span>
+                    <span class="k">if</span> <span class="s1">&#39;sub_domain&#39;</span> <span class="ow">in</span> <span class="n">route</span><span class="o">.</span><span class="n">defaults</span><span class="p">:</span>
+                        <span class="n">newargs</span><span class="p">[</span><span class="s1">&#39;sub_domain&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">sub</span>
+
+            <span class="k">elif</span> <span class="n">use_current</span><span class="p">:</span>
+                <span class="n">newargs</span> <span class="o">=</span> <span class="n">_screenargs</span><span class="p">(</span><span class="n">kargs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">mapper</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">environ</span><span class="p">,</span> <span class="n">force_explicit</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="s1">&#39;sub_domain&#39;</span> <span class="ow">in</span> <span class="n">kargs</span><span class="p">:</span>
+                <span class="n">newargs</span> <span class="o">=</span> <span class="n">_subdomain_check</span><span class="p">(</span><span class="n">kargs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">mapper</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">environ</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">newargs</span> <span class="o">=</span> <span class="n">kargs</span>
+
+            <span class="n">anchor</span> <span class="o">=</span> <span class="n">anchor</span> <span class="ow">or</span> <span class="n">newargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;_anchor&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="n">host</span> <span class="o">=</span> <span class="n">host</span> <span class="ow">or</span> <span class="n">newargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;_host&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">protocol</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">protocol</span> <span class="o">=</span> <span class="n">newargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;_protocol&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="n">newargs</span><span class="p">[</span><span class="s1">&#39;_environ&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">environ</span>
+            <span class="n">url</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mapper</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span><span class="o">*</span><span class="n">route_args</span><span class="p">,</span> <span class="o">**</span><span class="n">newargs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">anchor</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">url</span> <span class="o">+=</span> <span class="s1">&#39;#&#39;</span> <span class="o">+</span> <span class="n">_url_quote</span><span class="p">(</span><span class="n">anchor</span><span class="p">,</span> <span class="n">encoding</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">host</span> <span class="ow">or</span> <span class="p">(</span><span class="n">protocol</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">or</span> <span class="n">qualified</span><span class="p">:</span>
+            <span class="k">if</span> <span class="s1">&#39;routes.cached_hostinfo&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">environ</span><span class="p">:</span>
+                <span class="n">cache_hostinfo</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">environ</span><span class="p">)</span>
+            <span class="n">hostinfo</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s1">&#39;routes.cached_hostinfo&#39;</span><span class="p">]</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">host</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">qualified</span><span class="p">:</span>
+                <span class="c1"># Ensure we don&#39;t use a specific port, as changing the protocol</span>
+                <span class="c1"># means that we most likely need a new port</span>
+                <span class="n">host</span> <span class="o">=</span> <span class="n">hostinfo</span><span class="p">[</span><span class="s1">&#39;host&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;:&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">elif</span> <span class="ow">not</span> <span class="n">host</span><span class="p">:</span>
+                <span class="n">host</span> <span class="o">=</span> <span class="n">hostinfo</span><span class="p">[</span><span class="s1">&#39;host&#39;</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">protocol</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">protocol</span> <span class="o">=</span> <span class="n">hostinfo</span><span class="p">[</span><span class="s1">&#39;protocol&#39;</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">protocol</span> <span class="o">!=</span> <span class="s1">&#39;&#39;</span><span class="p">:</span>
+                <span class="n">protocol</span> <span class="o">+=</span> <span class="s1">&#39;:&#39;</span>
+            <span class="k">if</span> <span class="n">url</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">host</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="s1">&#39;/&#39;</span><span class="p">:</span>
+                    <span class="n">host</span> <span class="o">+=</span> <span class="s1">&#39;/&#39;</span>
+                <span class="n">url</span> <span class="o">=</span> <span class="n">protocol</span> <span class="o">+</span> <span class="s1">&#39;//&#39;</span> <span class="o">+</span> <span class="n">host</span> <span class="o">+</span> <span class="n">url</span><span class="o">.</span><span class="n">lstrip</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">ascii_characters</span><span class="p">(</span><span class="n">url</span><span class="p">)</span> <span class="ow">and</span> <span class="n">url</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">GenerationException</span><span class="p">(</span><span class="s2">&quot;Can only return a string, got &quot;</span>
+                            <span class="s2">&quot;unicode instead: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">url</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">url</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">GenerationException</span><span class="p">(</span>
+                <span class="s2">&quot;Could not generate URL. Called with args: </span><span class="si">%s</span><span class="s2"> </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> \
+                <span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">kargs</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">url</span>
+
+<div class="viewcode-block" id="URLGenerator.current">
+<a class="viewcode-back" href="../../routes.html#routes.URLGenerator.current">[documenti]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">current</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Generate a route that includes params used on the current</span>
+<span class="sd">        request</span>
+
+<span class="sd">        The arguments for this method are identical to ``__call__``</span>
+<span class="sd">        except that arguments set to None will remove existing route</span>
+<span class="sd">        matches of the same name from the set of arguments used to</span>
+<span class="sd">        construct a URL.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="p">(</span><span class="n">_use_current</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="redirect_to">
+<a class="viewcode-back" href="../../routes.html#routes.redirect_to">[documenti]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">redirect_to</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kargs</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Issues a redirect based on the arguments.</span>
+
+<span class="sd">    Redirect&#39;s *should* occur as a &quot;302 Moved&quot; header, however the web</span>
+<span class="sd">    framework may utilize a different method.</span>
+
+<span class="sd">    All arguments are passed to url_for to retrieve the appropriate URL, then</span>
+<span class="sd">    the resulting URL it sent to the redirect function as the URL.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">target</span> <span class="o">=</span> <span class="n">url_for</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kargs</span><span class="p">)</span>
+    <span class="n">config</span> <span class="o">=</span> <span class="n">request_config</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">config</span><span class="o">.</span><span class="n">redirect</span><span class="p">(</span><span class="n">target</span><span class="p">)</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">cache_hostinfo</span><span class="p">(</span><span class="n">environ</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Processes the host information and stores a copy</span>
+
+<span class="sd">    This work was previously done but wasn&#39;t stored in environ, nor is</span>
+<span class="sd">    it guaranteed to be setup in the future (Routes 2 and beyond).</span>
+
+<span class="sd">    cache_hostinfo processes environ keys that may be present to</span>
+<span class="sd">    determine the proper host, protocol, and port information to use</span>
+<span class="sd">    when generating routes.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">hostinfo</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">if</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;HTTPS&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;wsgi.url_scheme&#39;</span><span class="p">)</span> <span class="o">==</span> <span class="s1">&#39;https&#39;</span> \
+       <span class="ow">or</span> <span class="s1">&#39;https&#39;</span> <span class="ow">in</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;HTTP_X_FORWARDED_PROTO&#39;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;, &#39;</span><span class="p">):</span>
+        <span class="n">hostinfo</span><span class="p">[</span><span class="s1">&#39;protocol&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;https&#39;</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">hostinfo</span><span class="p">[</span><span class="s1">&#39;protocol&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;http&#39;</span>
+    <span class="k">if</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;HTTP_X_FORWARDED_HOST&#39;</span><span class="p">):</span>
+        <span class="n">hostinfo</span><span class="p">[</span><span class="s1">&#39;host&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">environ</span><span class="p">[</span><span class="s1">&#39;HTTP_X_FORWARDED_HOST&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;, &#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">elif</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;HTTP_HOST&#39;</span><span class="p">):</span>
+        <span class="n">hostinfo</span><span class="p">[</span><span class="s1">&#39;host&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">environ</span><span class="p">[</span><span class="s1">&#39;HTTP_HOST&#39;</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">hostinfo</span><span class="p">[</span><span class="s1">&#39;host&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">environ</span><span class="p">[</span><span class="s1">&#39;SERVER_NAME&#39;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;wsgi.url_scheme&#39;</span><span class="p">)</span> <span class="o">==</span> <span class="s1">&#39;https&#39;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">environ</span><span class="p">[</span><span class="s1">&#39;SERVER_PORT&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="s1">&#39;443&#39;</span><span class="p">:</span>
+                <span class="n">hostinfo</span><span class="p">[</span><span class="s1">&#39;host&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="s1">&#39;:&#39;</span> <span class="o">+</span> <span class="n">environ</span><span class="p">[</span><span class="s1">&#39;SERVER_PORT&#39;</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">environ</span><span class="p">[</span><span class="s1">&#39;SERVER_PORT&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="s1">&#39;80&#39;</span><span class="p">:</span>
+                <span class="n">hostinfo</span><span class="p">[</span><span class="s1">&#39;host&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="s1">&#39;:&#39;</span> <span class="o">+</span> <span class="n">environ</span><span class="p">[</span><span class="s1">&#39;SERVER_PORT&#39;</span><span class="p">]</span>
+    <span class="n">environ</span><span class="p">[</span><span class="s1">&#39;routes.cached_hostinfo&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">hostinfo</span>
+    <span class="k">return</span> <span class="n">hostinfo</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">controller_scan</span><span class="p">(</span><span class="n">directory</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Scan a directory for python files and use them as controllers&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">directory</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">[]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">find_controllers</span><span class="p">(</span><span class="n">dirname</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Locate controllers in a directory&quot;&quot;&quot;</span>
+        <span class="n">controllers</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">fname</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="n">dirname</span><span class="p">):</span>
+            <span class="n">filename</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">dirname</span><span class="p">,</span> <span class="n">fname</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span> <span class="ow">and</span> \
+                    <span class="n">re</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;^[^_]{1,1}.*\.py$&#39;</span><span class="p">,</span> <span class="n">fname</span><span class="p">):</span>
+                <span class="n">controllers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">prefix</span> <span class="o">+</span> <span class="n">fname</span><span class="p">[:</span><span class="o">-</span><span class="mi">3</span><span class="p">])</span>
+            <span class="k">elif</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">filename</span><span class="p">):</span>
+                <span class="n">controllers</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">find_controllers</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span>
+                                                    <span class="n">prefix</span><span class="o">=</span><span class="n">prefix</span><span class="o">+</span><span class="n">fname</span><span class="o">+</span><span class="s1">&#39;/&#39;</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">controllers</span>
+    <span class="n">controllers</span> <span class="o">=</span> <span class="n">find_controllers</span><span class="p">(</span><span class="n">directory</span><span class="p">)</span>
+    <span class="c1"># Sort by string length, shortest goes first</span>
+    <span class="n">controllers</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="nb">len</span><span class="p">,</span> <span class="n">reverse</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">controllers</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">as_unicode</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">encoding</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="s1">&#39;strict&#39;</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">value</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">encoding</span><span class="p">,</span> <span class="n">errors</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">value</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">ascii_characters</span><span class="p">(</span><span class="n">string</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">string</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">True</span>
+
+    <span class="k">return</span> <span class="nb">all</span><span class="p">(</span><span class="nb">ord</span><span class="p">(</span><span class="n">c</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">128</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">string</span><span class="p">)</span>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">prokect_work_mp</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Vai" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigazione</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">server</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Codice del modulo</a><ul>
+  <li><a href="../routes.html">routes</a><ul>
+  </ul></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2025, manfredi_piraino.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.1.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>
