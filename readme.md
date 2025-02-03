@@ -16,4 +16,8 @@ L'applicazione è disponibile anche online agli indirizzi: <br>
 http://15.160.130.231:8000/ o<br>
 https://manfredipiraino.com
 
+## Documentazione Server wip
+Per accedere alla documentazione del server, recarsi al file di seguito: 
+[Apri Documentazione](server/docs/source/_build/index.html)
 
+Attenzione: Sara' necessario aprire il file da browser una volta installato il progetto
