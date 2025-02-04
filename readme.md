@@ -17,7 +17,7 @@ http://15.160.130.231:8000/ o<br>
 https://manfredipiraino.com
 
 ## Documentazione Server wip
-Per accedere alla documentazione del server, recarsi al file di seguito: 
-[Apri Documentazione](server/docs/source/_build/index.html)
+Per accedere alla documentazione del server, recarsi al link di seguito:
+https://manfre3d.github.io/project_work_server_docs/
 
-Attenzione: Sara' necessario aprire il file da browser una volta installato il progetto
+
