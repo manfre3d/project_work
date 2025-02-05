@@ -18,9 +18,12 @@ https://manfredipiraino.com
 
 ## Documentazione Server wip
 Per accedere alla documentazione del server, recarsi al link di seguito:
-https://manfre3d.github.io/project_work_server_docs/
+https://manfre3d.github.io/project_work_docs/
 
-(La documentazione del server python è stata generata con sphinx. Il codice statico della documentazione è nel seguente repository: https://github.com/manfre3d/project_work_server_docs
-)
+(La documentazione del server python è stata generata con sphinx. Il codice statico della documentazione è nel seguente repository: https://github.com/manfre3d/project_work_docs)
 
+## Documentazione Frontend wip
+Per accedere alla documentazione del server, recarsi al link di seguito:
+https://manfre3d.github.io/project_work_docs/
 
+(La documentazione del frontend è stata generata con jsdoc. Il codice statico della documentazione è nel seguente repository: https://github.com/manfre3d/project_work_docs)
