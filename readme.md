@@ -13,17 +13,17 @@
 
 ## Disponibilita' dell'applicazione Online
 L'applicazione è disponibile anche online agli indirizzi: <br>
-http://15.160.130.231:8000/ o<br>
-https://manfredipiraino.com
+<a href="http://15.160.130.231:8000/" target="_blank" rel="noopener noreferrer">http://15.160.130.231:8000/</a> o
+<a href="https://manfredipiraino.com" target="_blank" rel="noopener noreferrer">https://manfredipiraino.com</a>
 
 ## Documentazione Server wip
 Per accedere alla documentazione del server, recarsi al link di seguito:
-https://manfre3d.github.io/project_work_docs/
+<a href="https://manfre3d.github.io/project_work_docs/" target="_blank" rel="noopener noreferrer">https://manfre3d.github.io/project_work_docs/</a>
 
 (La documentazione del server python è stata generata con sphinx. Il codice statico della documentazione è nel seguente repository: https://github.com/manfre3d/project_work_docs)
 
 ## Documentazione Frontend wip
 Per accedere alla documentazione del server, recarsi al link di seguito:
-https://manfre3d.github.io/project_work_docs/
+<a href="https://manfre3d.github.io/project_work_docs/" target="_blank" rel="noopener noreferrer">https://manfre3d.github.io/project_work_docs/</a>
 
 (La documentazione del frontend è stata generata con jsdoc. Il codice statico della documentazione è nel seguente repository: https://github.com/manfre3d/project_work_docs)
