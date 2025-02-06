@@ -1,29 +1,39 @@
+# Guida all'Avvio del Server Python
+
 ## Overview
-   Per avviare il server python è necessario seguire i passaggi di seguito
+Per avviare il server Python, seguire i passaggi indicati di seguito.
 
 ## Installazione
-1. Installare Python 3.
-2. Installare i file necessari lanciando l'apposito comando (sarà necessario posizionarsi all'interno della cartella di progetto nella directory in cui è contenuto il file requirements.txt):<br>
-   **pip install -r requirements.txt**
+1. Installare **Python 3**.
+2. Installare i file necessari eseguendo il comando seguente nella cartella di progetto (dove si trova il file `requirements.txt`):  
+   ```sh
+   pip install -r requirements.txt
+   ```
 
 ## Utilizzo
-1. Una volta installato tutti i programmi necessari sarà sufficiente lanciare il comando per eseguire il server:
-   **python server.py**
-2. Per accedere all'applicativo in esecuzione, bastera andare all'indirizzo locale:<br>    **http://localhost:8000**<br>
+1. Dopo aver installato tutte le dipendenze, avviare il server con il comando:  
+   ```sh
+   python server.py
+   ```
+2. Per accedere all'applicazione in esecuzione, aprire il browser e visitare:  
+   [http://localhost:8000](http://localhost:8000)
 
-## Disponibilita' dell'applicazione Online
-L'applicazione è disponibile anche online agli indirizzi: <br>
-<a href="http://15.160.130.231:8000/" target="_blank" rel="noopener noreferrer">http://15.160.130.231:8000/</a> o
-<a href="https://manfredipiraino.com" target="_blank" rel="noopener noreferrer">https://manfredipiraino.com</a>
+## Disponibilità dell'Applicazione Online
+L'applicazione è disponibile anche online ai seguenti indirizzi:
+- [http://15.160.130.231:8000/](http://15.160.130.231:8000/)
+- [https://manfredipiraino.com](https://manfredipiraino.com)
 
-## Documentazione Server wip
-Per accedere alla documentazione del server, recarsi al link di seguito:
-<a href="https://manfre3d.github.io/project_work_docs/" target="_blank" rel="noopener noreferrer">https://manfre3d.github.io/project_work_docs/</a>
+## Documentazione Server (Work in Progress)
+Per accedere alla documentazione del server, visitare il link seguente:  
+[https://manfre3d.github.io/project_work_docs/](https://manfre3d.github.io/project_work_docs/)
 
-(La documentazione del server python è stata generata con sphinx. Il codice statico della documentazione è nel seguente repository: https://github.com/manfre3d/project_work_docs)
+La documentazione è stata generata con **Sphinx**. Il codice sorgente della documentazione è disponibile nel repository:  
+[https://github.com/manfre3d/project_work_docs](https://github.com/manfre3d/project_work_docs)
 
-## Documentazione Frontend wip
-Per accedere alla documentazione del server, recarsi al link di seguito:
-<a href="https://manfre3d.github.io/project_work_docs/" target="_blank" rel="noopener noreferrer">https://manfre3d.github.io/project_work_docs/</a>
+## Documentazione Frontend (Work in Progress)
+Per accedere alla documentazione del frontend, visitare il link seguente:  
+[https://manfre3d.github.io/project_work_docs/](https://manfre3d.github.io/project_work_docs/)
 
-(La documentazione del frontend è stata generata con jsdoc. Il codice statico della documentazione è nel seguente repository: https://github.com/manfre3d/project_work_docs)
+La documentazione è stata generata con **JSDoc**. Il codice sorgente della documentazione è disponibile nel repository:  
+[https://github.com/manfre3d/project_work_docs](https://github.com/manfre3d/project_work_docs)
+
