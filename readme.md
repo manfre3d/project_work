@@ -37,3 +37,8 @@ Per accedere alla documentazione del frontend, visitare il link seguente:
 La documentazione è stata generata con **JSDoc**. Il codice sorgente della documentazione è disponibile nel repository:  
 [https://github.com/manfre3d/project_work_docs](https://github.com/manfre3d/project_work_docs)
 
+## Struttura di progetto
+
+Di seguito un diagramma UML dei componenti che illustra la struttura di base del progetto:
+
+![alt text](image.png)
